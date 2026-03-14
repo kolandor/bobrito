@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  bobrito:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bobrito-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/bobrito.db
+      - LOG_FILE=/app/logs/bobrito.log
+    volumes:
+      - bobrito_data:/app/data
+      - bobrito_logs:/app/logs
+    ports:
+      - "8080:8080"   # REST API
+      - "9090:9090"   # Prometheus metrics
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: bobrito-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9191:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: bobrito-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  bobrito_data:
+  bobrito_logs:
+  prometheus_data:
+  grafana_data:
