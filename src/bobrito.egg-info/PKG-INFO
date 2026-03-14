@@ -1,0 +1,34 @@
+Metadata-Version: 2.4
+Name: bobrito
+Version: 1.1.0
+Summary: Automated Trading Bot for Binance Spot BTC/USDT
+Requires-Python: >=3.11
+Requires-Dist: fastapi>=0.111.0
+Requires-Dist: uvicorn[standard]>=0.29.0
+Requires-Dist: pydantic>=2.7.0
+Requires-Dist: pydantic-settings>=2.3.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: sqlalchemy>=2.0.30
+Requires-Dist: alembic>=1.13.1
+Requires-Dist: aiosqlite>=0.20.0
+Requires-Dist: binance-connector>=3.8.0
+Requires-Dist: websockets>=12.0
+Requires-Dist: numpy>=1.26.0
+Requires-Dist: pandas>=2.2.0
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: aiohttp>=3.9.0
+Requires-Dist: tenacity>=8.3.0
+Requires-Dist: loguru>=0.7.2
+Requires-Dist: prometheus-client>=0.20.0
+Requires-Dist: python-jose[cryptography]>=3.3.0
+Requires-Dist: passlib[bcrypt]>=1.7.4
+Requires-Dist: python-multipart>=0.0.9
+Provides-Extra: dev
+Requires-Dist: pytest>=8.2.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23.7; extra == "dev"
+Requires-Dist: pytest-cov>=5.0.0; extra == "dev"
+Requires-Dist: pytest-mock>=3.14.0; extra == "dev"
+Requires-Dist: black>=24.4.2; extra == "dev"
+Requires-Dist: ruff>=0.4.7; extra == "dev"
+Requires-Dist: mypy>=1.10.0; extra == "dev"
+Requires-Dist: types-passlib>=1.7.7; extra == "dev"
