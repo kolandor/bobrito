@@ -79,6 +79,48 @@ class PortfolioManager:
 
     # ── Startup bootstrap ─────────────────────────────────────────────────
 
+    async def restore_open_position(self) -> PositionState | None:
+        """Reload any OPEN position from the database after a restart.
+
+        If a position was open when the process stopped, this re-creates
+        the in-memory PositionState so stop/target monitoring continues
+        seamlessly on the next market snapshot.
+
+        Returns the restored PositionState, or None if no open position exists.
+        """
+        async with self._db.session() as sess:
+            result = await sess.execute(
+                select(DBPosition)
+                .where(DBPosition.status == PositionStatus.OPEN)
+                .limit(1)
+            )
+            db_pos = result.scalar_one_or_none()
+
+        if db_pos is None:
+            return None
+
+        pos = PositionState(
+            db_id=db_pos.id,
+            symbol=db_pos.symbol,
+            side=db_pos.side,
+            entry_price=db_pos.entry_price,
+            quantity=db_pos.quantity,
+            stop_price=db_pos.stop_price,
+            target_price=db_pos.target_price,
+            entry_time=db_pos.opened_at,
+            fees=db_pos.total_fees,
+            signal_id=db_pos.signal_id,
+        )
+        self._open_position = pos
+        MetricsCollector.open_position.set(1)
+        log.info(
+            f"Open position restored from DB: id={db_pos.id} "
+            f"symbol={db_pos.symbol} entry={db_pos.entry_price:.2f} "
+            f"qty={db_pos.quantity:.6f} stop={db_pos.stop_price:.2f} "
+            f"target={db_pos.target_price:.2f}"
+        )
+        return pos
+
     async def load_historical_stats(self) -> None:
         """Seed in-memory counters from closed positions stored in the database.
 

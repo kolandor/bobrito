@@ -117,6 +117,11 @@ class TradingBot:
         await self._portfolio.load_historical_stats()
         await self._risk.load_daily_stats()
 
+        # For paper trading: reconstruct the actual account balance and any
+        # in-progress open position from the database, so restarts are seamless.
+        if isinstance(self._broker, PaperBroker):
+            await self._restore_paper_state()
+
         await self._feed.start()
         self._start_time = time.time()
         self._status = BotStatus.RUNNING
@@ -188,6 +193,56 @@ class TradingBot:
 
     def get_last_snapshot(self) -> MarketSnapshot | None:
         return self._last_snapshot
+
+    # ── Paper-mode state restoration ───────────────────────────────────────
+
+    async def _restore_paper_state(self) -> None:
+        """Reconstruct PaperBroker balance and in-progress position from DB.
+
+        Walk the closed positions to compute total realised PnL, then check
+        for an open position.  The resulting USDT/BTC balances are pushed into
+        the PaperBroker so risk management and position sizing work correctly
+        from the first snapshot after a restart.
+        """
+        from sqlalchemy import func, select
+
+        from bobrito.persistence.models import Position as DBPos
+        from bobrito.persistence.models import PositionStatus
+
+        initial = self._s.initial_capital_usdt
+
+        async with self._db.session() as sess:
+            pnl_row = await sess.execute(
+                select(func.coalesce(func.sum(DBPos.net_pnl), 0.0)).where(
+                    DBPos.status == PositionStatus.CLOSED
+                )
+            )
+            total_pnl = float(pnl_row.scalar() or 0.0)
+
+        # Restore any open position into PortfolioManager
+        open_pos = await self._portfolio.restore_open_position()
+
+        free_usdt = initial + total_pnl
+        free_btc = 0.0
+
+        if open_pos:
+            # The USDT cost of the open position was already deducted when
+            # the entry order was placed, so subtract it again.
+            cost = open_pos.entry_price * open_pos.quantity + open_pos.fees
+            free_usdt -= cost
+            free_btc = open_pos.quantity
+
+        free_usdt = max(free_usdt, 0.0)
+
+        log.info(
+            f"Paper state restored from DB: "
+            f"initial={initial:.2f} realised_pnl={total_pnl:+.4f} "
+            f"→ free_usdt={free_usdt:.2f} free_btc={free_btc:.6f}"
+            + (f" (open position id={open_pos.db_id})" if open_pos else "")
+        )
+
+        assert isinstance(self._broker, PaperBroker)
+        self._broker.restore_balances(free_usdt, free_btc)
 
     # ── Core processing loop ───────────────────────────────────────────────
 

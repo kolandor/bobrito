@@ -133,5 +133,19 @@ class PaperBroker(BrokerBase):
             self._balances["BTC"]["free"] -= result.filled_qty
             self._balances["USDT"]["free"] += notional - commission
 
+    def restore_balances(self, free_usdt: float, free_btc: float) -> None:
+        """Overwrite balances with values reconstructed from the database.
+
+        Called once at bot startup in paper mode so the simulated account
+        always reflects the true state regardless of how many restarts
+        have occurred.
+        """
+        self._balances["USDT"]["free"] = max(free_usdt, 0.0)
+        self._balances["BTC"]["free"] = max(free_btc, 0.0)
+        log.info(
+            f"[PAPER] Balances restored from DB: "
+            f"USDT={free_usdt:.2f} BTC={free_btc:.6f}"
+        )
+
     def get_full_balances(self) -> dict:
         return {k: dict(v) for k, v in self._balances.items()}

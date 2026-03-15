@@ -351,20 +351,26 @@ class RiskManager:
         stop_distance: float,
         free_usdt: float,
     ) -> tuple[float, float]:
-        """Fixed-fractional position sizing.
+        """Fixed-fractional position sizing on actual current equity.
+
+        Uses the actual available balance (free_usdt minus the required
+        reserve) as the capital base so that position sizes scale correctly
+        after profits or losses rather than always anchoring to the initial
+        deposit.
 
         Returns (quantity, risk_amount_usdt).
         """
-        capital = self._s.initial_capital_usdt
-        risk_amount = capital * self._s.risk_per_trade_pct / 100
+        tradeable = free_usdt - self._s.min_free_balance_usdt
+        if tradeable <= 0:
+            return 0.0, 0.0
+
+        risk_amount = tradeable * self._s.risk_per_trade_pct / 100
         raw_qty = risk_amount / stop_distance
         qty = _round_step(raw_qty, self._step_size)
         qty = max(qty, self._min_qty)
 
-        # Cap so notional never exceeds available margin
-        max_affordable_qty = _round_step(
-            (free_usdt - self._s.min_free_balance_usdt) / price, self._step_size
-        )
+        # Hard cap: never spend more than the full tradeable balance
+        max_affordable_qty = _round_step(tradeable / price, self._step_size)
         qty = min(qty, max_affordable_qty)
         return qty, risk_amount
 
