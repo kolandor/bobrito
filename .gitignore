@@ -5,6 +5,10 @@ __pycache__/
 *.so
 *.pyd
 
+# ── Source tree cache artifacts ───────────────────────────────────────────────
+src/**/__pycache__/
+tests/**/__pycache__/
+
 # ── Build / distribution ──────────────────────────────────────────────────────
 build/
 dist/
