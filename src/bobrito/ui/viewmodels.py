@@ -93,6 +93,9 @@ class TradeVM:
     exit_reason: str | None
     opened_at: str
     closed_at: str | None
+    stop_price: float | None = None
+    target_price: float | None = None
+    explanation: str = ""
     pnl_class: str = "text-slate-400"
 
 

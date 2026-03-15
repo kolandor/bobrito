@@ -78,6 +78,66 @@ _STATUS_STYLES: dict[str, tuple[str, str]] = {
     "stopping": ("text-orange-400", "bg-orange-400"),
 }
 
+def _trade_explanation(
+    exit_reason: str | None,
+    entry_price: float,
+    exit_price: float | None,
+    stop_price: float | None,
+    target_price: float | None,
+    net_pnl: float | None,
+    quantity: float,
+) -> str:
+    """Build a human-readable sentence explaining why a position was closed."""
+    ep = f"${entry_price:,.2f}" if entry_price else "?"
+    xp = f"${exit_price:,.2f}" if exit_price else "?"
+    pnl_str = (
+        f"{'gain' if (net_pnl or 0) >= 0 else 'loss'} "
+        f"{'+'if (net_pnl or 0) >= 0 else ''}{net_pnl:.4f} USDT after fees"
+        if net_pnl is not None
+        else "PnL unknown"
+    )
+    qty_str = f"{quantity:.6f}"
+
+    if exit_reason == "TAKE_PROFIT":
+        tp = f"${target_price:,.2f}" if target_price else "the target"
+        return (
+            f"Take-profit hit: {xp} reached or exceeded the target level {tp}. "
+            f"Entry was {ep} for {qty_str} BTC. "
+            f"Position closed with a {pnl_str}."
+        )
+    if exit_reason == "STOP_LOSS":
+        sl = f"${stop_price:,.2f}" if stop_price else "the stop level"
+        return (
+            f"Stop-loss triggered: price fell to {xp}, breaching the stop at {sl}. "
+            f"Entry was {ep} for {qty_str} BTC. "
+            f"Position closed with a {pnl_str}."
+        )
+    if exit_reason == "MOMENTUM_FAILURE":
+        return (
+            f"Strategy exit signal: the trend-pullback strategy detected that "
+            f"upward momentum had reversed or entry conditions were no longer valid. "
+            f"Position was closed at {xp} (entry {ep}, {qty_str} BTC). "
+            f"Result: {pnl_str}."
+        )
+    if exit_reason == "EMERGENCY":
+        return (
+            f"Emergency stop executed: the bot was halted manually and all open "
+            f"positions were force-closed at market price ({xp}). "
+            f"Entry was {ep} for {qty_str} BTC. Result: {pnl_str}."
+        )
+    if exit_reason == "SESSION_CLOSE":
+        return (
+            f"Session boundary: position auto-closed at {xp} due to end-of-session "
+            f"protocol. Entry was {ep} for {qty_str} BTC. Result: {pnl_str}."
+        )
+    if exit_reason == "MANUAL":
+        return (
+            f"Manual close: position closed by the operator at {xp}. "
+            f"Entry was {ep} for {qty_str} BTC. Result: {pnl_str}."
+        )
+    return ""
+
+
 _EVENT_CLASSES: dict[str, str] = {
     "BOT_START": "text-green-400",
     "BOT_STOP": "text-slate-400",
@@ -223,6 +283,7 @@ class UIService:
                 trades = []
                 for r in rows:
                     pnl = r.net_pnl
+                    reason = r.exit_reason.value if hasattr(r.exit_reason, "value") else r.exit_reason
                     trades.append(
                         TradeVM(
                             id=r.id,
@@ -231,9 +292,20 @@ class UIService:
                             exit_price=r.exit_price,
                             quantity=r.quantity,
                             net_pnl=pnl,
-                            exit_reason=r.exit_reason,
+                            exit_reason=reason,
                             opened_at=r.opened_at.strftime("%Y-%m-%d %H:%M") if r.opened_at else "",
                             closed_at=r.closed_at.strftime("%Y-%m-%d %H:%M") if r.closed_at else "",
+                            stop_price=r.stop_price,
+                            target_price=r.target_price,
+                            explanation=_trade_explanation(
+                                reason,
+                                r.entry_price,
+                                r.exit_price,
+                                r.stop_price,
+                                r.target_price,
+                                pnl,
+                                r.quantity,
+                            ),
                             pnl_class=_pnl_class(pnl),
                         )
                     )
