@@ -15,7 +15,7 @@
       }
     }
   </script>
-  <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2uodhrgzmievKEpqs37RLE/9UlO1eCfzR2U" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="{{ prefix }}/static/css/app.css">
 </head>
@@ -27,7 +27,12 @@
       <div class="flex items-center justify-between h-14">
         <div class="flex items-center gap-3">
           <a href="{{ prefix }}/dashboard" class="flex items-center gap-2 text-white font-bold text-lg tracking-tight hover:text-slate-200 transition-colors">
-            <span class="text-xl">⚙</span> Bobrito
+            <img
+              src="{{ prefix }}/static/images/bobrito-logo.png"
+              alt="Bobrito logo"
+              class="h-7 w-auto rounded-sm"
+            >
+            <span>Bobrito</span>
           </a>
           {% if mode %}
           <span class="px-2 py-0.5 rounded text-xs font-mono font-semibold uppercase border

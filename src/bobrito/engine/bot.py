@@ -204,8 +204,13 @@ class TradingBot:
 
         try:
             await self._process_snapshot(snapshot)
+        except (TypeError, AttributeError, ValueError) as exc:
+            # Programming errors — log but do NOT trigger safe mode so the
+            # bug can be fixed and the bot restarted without a stuck safe-mode latch.
+            log.exception(f"Bug in snapshot processing (safe mode NOT activated): {exc}")
         except Exception as exc:
-            log.exception(f"Error processing snapshot: {exc}")
+            # Unexpected runtime errors (network, DB, exchange) → safe mode.
+            log.exception(f"Critical error processing snapshot: {exc}")
             self._risk.activate_safe_mode(f"Processing error: {exc}")
 
     async def _process_snapshot(self, snapshot: MarketSnapshot) -> None:
@@ -243,7 +248,7 @@ class TradingBot:
         balances = await self._broker.get_balances()
         free_usdt = balances.get("USDT", 0.0)
 
-        decision = await self._risk.validate_entry(signal, free_usdt, has_position=False)
+        decision = await self._risk.validate_entry(signal, free_usdt, has_open_position=False)
 
         if not decision.allowed:
             log.debug(f"Entry blocked by risk: {decision.reason}")
