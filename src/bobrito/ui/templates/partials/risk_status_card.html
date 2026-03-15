@@ -1,0 +1,62 @@
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5">
+  <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-4">Risk Guard</h3>
+
+  {% if risk_vm %}
+
+  {% if risk_vm.safe_mode %}
+  <div class="bg-orange-950/60 border border-orange-700/60 rounded-lg px-3 py-2.5 mb-4">
+    <p class="text-orange-400 text-xs font-bold">⚠ SAFE MODE ACTIVE — All new entries blocked</p>
+  </div>
+  {% endif %}
+
+  <div class="space-y-3 text-sm">
+    <div>
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-slate-500 text-xs">Daily trades</span>
+        <span class="text-slate-300 text-xs font-mono">{{ risk_vm.daily_trades }} / {{ risk_vm.max_trades_per_day }}</span>
+      </div>
+      <div class="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+        <div class="h-full rounded-full transition-all
+          {% if risk_vm.daily_trades >= risk_vm.max_trades_per_day %}bg-red-500
+          {% elif risk_vm.daily_trades >= risk_vm.max_trades_per_day * 0.7 %}bg-yellow-500
+          {% else %}bg-blue-500{% endif %}"
+          style="width: {{ [([risk_vm.daily_trades / risk_vm.max_trades_per_day * 100, 0] | max), 100] | min }}%"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-slate-500 text-xs">Consecutive losses</span>
+        <span class="text-slate-300 text-xs font-mono">{{ risk_vm.consecutive_losses }} / {{ risk_vm.max_consecutive_losses }}</span>
+      </div>
+      <div class="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+        <div class="h-full rounded-full transition-all
+          {% if risk_vm.consecutive_losses >= risk_vm.max_consecutive_losses %}bg-red-500
+          {% elif risk_vm.consecutive_losses >= risk_vm.max_consecutive_losses - 1 %}bg-yellow-500
+          {% else %}bg-green-500{% endif %}"
+          style="width: {{ [([risk_vm.consecutive_losses / risk_vm.max_consecutive_losses * 100, 0] | max), 100] | min }}%"></div>
+      </div>
+    </div>
+
+    <div class="pt-2 border-t border-slate-700/60 space-y-1.5">
+      <div class="flex justify-between items-center">
+        <span class="text-slate-500 text-xs">Daily PnL</span>
+        <span class="font-mono text-xs {% if risk_vm.daily_pnl < 0 %}text-red-400{% elif risk_vm.daily_pnl > 0 %}text-green-400{% else %}text-slate-400{% endif %}">
+          {% if risk_vm.daily_pnl >= 0 %}+{% endif %}{{ "%.4f"|format(risk_vm.daily_pnl) }} USDT
+        </span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-slate-500 text-xs">Trading day</span>
+        <span class="text-slate-400 text-xs">{{ risk_vm.current_day }}</span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-slate-500 text-xs">Max daily loss</span>
+        <span class="text-slate-400 text-xs">{{ risk_vm.max_daily_loss_pct }}%</span>
+      </div>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="text-slate-500 text-sm">Risk data not available</div>
+  {% endif %}
+</div>

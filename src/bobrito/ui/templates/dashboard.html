@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+  <h2 class="text-lg font-semibold text-white">Dashboard</h2>
+  <p class="text-slate-500 text-sm">Live overview — refreshes every {{ refresh_seconds }}s</p>
+</div>
+
+<!-- ── Row 1: Bot Status | Market Data | Control Buttons ──────────────────── -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+
+  <!-- Bot Status Card -->
+  <div hx-get="{{ prefix }}/partials/dashboard-status"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+
+  <!-- System Status Card -->
+  <div hx-get="{{ prefix }}/partials/system-status"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+
+  <!-- Control Buttons -->
+  <div hx-get="{{ prefix }}/partials/control-buttons"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+</div>
+
+<!-- ── Row 2: Balances | Open Position ────────────────────────────────────── -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+
+  <div hx-get="{{ prefix }}/partials/balances"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+
+  <div hx-get="{{ prefix }}/partials/position"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+</div>
+
+<!-- ── Row 3: Metrics | Risk ──────────────────────────────────────────────── -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+
+  <div hx-get="{{ prefix }}/partials/metrics"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+
+  <div hx-get="{{ prefix }}/partials/risk"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+</div>
+
+<!-- ── Row 4: Recent Events ───────────────────────────────────────────────── -->
+<div hx-get="{{ prefix }}/partials/events-table"
+     hx-trigger="load, every {{ refresh_seconds }}s"
+     hx-swap="innerHTML">
+  {% include "partials/_loading_card.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5">
+  <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-4">Bot Status</h3>
+
+  {% if status_vm %}
+  <div class="flex items-center gap-2.5 mb-4">
+    <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 {{ status_vm.status_dot }}"></span>
+    <span class="text-xl font-bold uppercase {{ status_vm.status_color }}">{{ status_vm.status }}</span>
+    {% if status_vm.paused and status_vm.status != 'paused' %}
+    <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-900/40 text-yellow-400 border border-yellow-700/50">paused</span>
+    {% endif %}
+  </div>
+
+  <div class="space-y-2 text-sm">
+    <div class="flex justify-between items-center">
+      <span class="text-slate-500">Symbol</span>
+      <span class="text-slate-200 font-mono">{{ status_vm.symbol }}</span>
+    </div>
+    <div class="flex justify-between items-center">
+      <span class="text-slate-500">Uptime</span>
+      <span class="text-slate-200">{{ status_vm.uptime_formatted }}</span>
+    </div>
+    <div class="flex justify-between items-center">
+      <span class="text-slate-500">Snapshots</span>
+      <span class="text-slate-200 font-mono">{{ "{:,}".format(status_vm.snapshot_count) }}</span>
+    </div>
+    {% if status_vm.feed_lag_formatted %}
+    <div class="flex justify-between items-center">
+      <span class="text-slate-500">Feed lag</span>
+      <span class="{% if status_vm.is_feed_stale %}text-red-400{% else %}text-slate-200{% endif %} font-mono text-xs">
+        {{ status_vm.feed_lag_formatted }}
+      </span>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if status_vm.safe_mode %}
+  <div class="mt-4 bg-orange-950/50 border border-orange-700/60 rounded-lg px-3 py-2.5">
+    <p class="text-orange-400 text-xs font-semibold">⚠ SAFE MODE ACTIVE — New entries blocked</p>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="text-slate-500 text-sm">Bot not initialised</div>
+  {% endif %}
+</div>

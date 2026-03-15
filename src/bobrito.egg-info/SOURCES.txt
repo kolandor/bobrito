@@ -41,3 +41,9 @@ src/bobrito/strategy/__init__.py
 src/bobrito/strategy/base.py
 src/bobrito/strategy/indicators.py
 src/bobrito/strategy/trend_pullback.py
+src/bobrito/ui/__init__.py
+src/bobrito/ui/auth.py
+src/bobrito/ui/dependencies.py
+src/bobrito/ui/routes.py
+src/bobrito/ui/services.py
+src/bobrito/ui/viewmodels.py

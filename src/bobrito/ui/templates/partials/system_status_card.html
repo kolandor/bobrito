@@ -1,0 +1,41 @@
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5">
+  <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-4">Market Data Feed</h3>
+
+  {% if system_vm %}
+  <div class="flex items-center gap-2.5 mb-4">
+    <span class="w-2.5 h-2.5 rounded-full flex-shrink-0
+      {% if system_vm.ws_connected %}bg-green-400 animate-pulse{% else %}bg-slate-500{% endif %}">
+    </span>
+    <span class="text-lg font-bold {% if system_vm.ws_connected %}text-green-400{% else %}text-slate-400{% endif %}">
+      {% if system_vm.ws_connected %}CONNECTED{% else %}DISCONNECTED{% endif %}
+    </span>
+  </div>
+
+  <div class="space-y-2 text-sm">
+    <div class="flex justify-between items-center">
+      <span class="text-slate-500">Snapshots recv.</span>
+      <span class="text-slate-200 font-mono">{{ "{:,}".format(system_vm.snapshot_count) }}</span>
+    </div>
+    {% if system_vm.feed_lag_formatted %}
+    <div class="flex justify-between items-center">
+      <span class="text-slate-500">Feed lag</span>
+      <span class="font-mono text-xs
+        {% if system_vm.is_feed_stale %}text-red-400
+        {% elif system_vm.feed_lag_seconds and system_vm.feed_lag_seconds > 10 %}text-yellow-400
+        {% else %}text-slate-200{% endif %}">
+        {{ system_vm.feed_lag_formatted }}
+      </span>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if system_vm.is_feed_stale %}
+  <div class="mt-4 bg-red-950/50 border border-red-700/60 rounded-lg px-3 py-2.5">
+    <p class="text-red-400 text-xs font-semibold">⚠ Feed lag exceeds threshold — data may be stale</p>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="text-slate-500 text-sm">Feed not available</div>
+  {% endif %}
+</div>

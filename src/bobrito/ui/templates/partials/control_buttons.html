@@ -1,0 +1,120 @@
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5"
+     x-data="{
+       confirm: null,
+       msgs: {
+         stop: 'Gracefully stop the bot. Are you sure?',
+         resume: 'Resume the bot from paused state. Are you sure?',
+         emergency_stop: '⚠ EMERGENCY STOP will immediately halt trading and close any open position at market price. This cannot be undone. Confirm?'
+       }
+     }">
+  <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-4">Bot Control</h3>
+
+  {% if readonly %}
+  <div class="bg-slate-700/50 border border-slate-600/50 rounded-lg px-3 py-2.5 mb-4">
+    <p class="text-slate-400 text-xs">Read-only mode — control actions disabled</p>
+  </div>
+  {% endif %}
+
+  {% if is_live and confirm_live_actions %}
+  <div class="bg-red-950/50 border border-red-700/60 rounded-lg px-3 py-2.5 mb-4">
+    <p class="text-red-400 text-xs font-semibold">⚠ LIVE MODE — All actions affect real funds</p>
+  </div>
+  {% endif %}
+
+  <div class="space-y-2">
+    {% if allow_start_stop %}
+    <!-- Start -->
+    <form method="post" action="{{ prefix }}/actions/start">
+      <button type="submit"
+        {% if readonly %}disabled{% endif %}
+        class="w-full py-2 px-4 rounded-lg text-sm font-semibold transition-colors
+          {% if readonly %}bg-slate-700 text-slate-500 cursor-not-allowed
+          {% else %}bg-green-800 hover:bg-green-700 text-green-100 active:scale-95{% endif %}">
+        ▶ Start
+      </button>
+    </form>
+
+    <!-- Pause -->
+    <form method="post" action="{{ prefix }}/actions/pause">
+      <button type="submit"
+        {% if readonly %}disabled{% endif %}
+        class="w-full py-2 px-4 rounded-lg text-sm font-semibold transition-colors
+          {% if readonly %}bg-slate-700 text-slate-500 cursor-not-allowed
+          {% else %}bg-yellow-800 hover:bg-yellow-700 text-yellow-100 active:scale-95{% endif %}">
+        ⏸ Pause
+      </button>
+    </form>
+
+    <!-- Resume -->
+    <form method="post" action="{{ prefix }}/actions/resume"
+          id="form-resume"
+          @submit.prevent="confirm = 'resume'">
+      <button type="submit"
+        {% if readonly %}disabled{% endif %}
+        class="w-full py-2 px-4 rounded-lg text-sm font-semibold transition-colors
+          {% if readonly %}bg-slate-700 text-slate-500 cursor-not-allowed
+          {% else %}bg-blue-800 hover:bg-blue-700 text-blue-100 active:scale-95{% endif %}">
+        ▶▶ Resume
+      </button>
+    </form>
+
+    <!-- Stop -->
+    <form method="post" action="{{ prefix }}/actions/stop"
+          id="form-stop"
+          @submit.prevent="confirm = 'stop'">
+      <button type="submit"
+        {% if readonly %}disabled{% endif %}
+        class="w-full py-2 px-4 rounded-lg text-sm font-semibold transition-colors
+          {% if readonly %}bg-slate-700 text-slate-500 cursor-not-allowed
+          {% else %}bg-orange-800 hover:bg-orange-700 text-orange-100 active:scale-95{% endif %}">
+        ⏹ Stop
+      </button>
+    </form>
+    {% endif %}
+
+    <!-- Emergency Stop -->
+    {% if allow_emergency_stop %}
+    <form method="post" action="{{ prefix }}/actions/emergency-stop"
+          id="form-emergency_stop"
+          @submit.prevent="confirm = 'emergency_stop'">
+      <button type="submit"
+        {% if readonly %}disabled{% endif %}
+        class="w-full py-2 px-4 rounded-lg text-sm font-bold transition-colors border
+          {% if readonly %}bg-slate-700 text-slate-500 cursor-not-allowed border-slate-600
+          {% else %}bg-red-900 hover:bg-red-800 text-red-100 border-red-600 active:scale-95{% endif %}">
+        🚨 Emergency Stop
+      </button>
+    </form>
+    {% endif %}
+  </div>
+
+  <!-- Confirmation modal -->
+  <div x-show="confirm !== null"
+       x-transition:enter="transition ease-out duration-150"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-100"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+       style="display: none;"
+       @keydown.escape.window="confirm = null">
+    <div class="bg-slate-800 border border-slate-600 rounded-xl p-6 max-w-sm w-full shadow-2xl"
+         @click.stop>
+      <h3 class="text-white font-bold text-base mb-3">Confirm Action</h3>
+      <p class="text-slate-400 text-sm mb-5 leading-relaxed" x-text="msgs[confirm] || 'Are you sure?'"></p>
+      <div class="flex gap-3">
+        <button
+          @click="let f = confirm; confirm = null; document.getElementById('form-' + f).submit();"
+          class="flex-1 bg-red-700 hover:bg-red-600 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors">
+          Confirm
+        </button>
+        <button
+          @click="confirm = null"
+          class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2.5 rounded-lg text-sm transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,6 +1,6 @@
 # Bobrito — Automated Trading Bot for Binance Spot BTC/USDT
 
-**Version 1.1** · Python 3.11+ · FastAPI · SQLite · Docker
+**Version 1.1** · Python 3.11+ · FastAPI · SQLite · Docker · Web UI
 
 > A production-grade automated trading platform with strict risk management,
 > paper/testnet/live mode switching, full observability, and a REST API for control.
@@ -16,10 +16,11 @@
 5. [Risk Management](#risk-management)
 6. [Execution Modes](#execution-modes)
 7. [API Reference](#api-reference)
-8. [Docker Deployment](#docker-deployment)
-9. [Running Tests](#running-tests)
-10. [Project Structure](#project-structure)
-11. [Safety Notes](#safety-notes)
+8. [Web UI](#web-ui)
+9. [Docker Deployment](#docker-deployment)
+10. [Running Tests](#running-tests)
+11. [Project Structure](#project-structure)
+12. [Safety Notes](#safety-notes)
 
 ---
 
@@ -297,6 +298,82 @@ pytest --cov=bobrito --cov-report=term-missing
 
 ---
 
+## Web UI
+
+Bobrito includes an **optional embedded operator dashboard** built with FastAPI + Jinja2 + HTMX + Alpine.js. It runs inside the same process as the API — no separate frontend server or build step required.
+
+### Enabling the UI
+
+The UI is **disabled by default**. Set `WEB_UI_ENABLED=true` in your `.env` file:
+
+```env
+WEB_UI_ENABLED=true
+WEB_UI_ROUTE_PREFIX=/ui
+WEB_UI_USERNAME=admin
+WEB_UI_PASSWORD=change_me_strong_password
+WEB_UI_SESSION_SECRET=change_me_very_long_random_secret_at_least_32_chars
+```
+
+Then start the bot normally:
+
+```bash
+cp .env.example .env
+# Edit .env: set WEB_UI_ENABLED=true and the credentials above
+python -m bobrito.main
+# Open http://localhost:8080/ui in your browser
+```
+
+Or with Docker:
+
+```bash
+docker-compose up -d
+# Open http://localhost:8080/ui
+```
+
+### UI Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `WEB_UI_ENABLED` | `false` | Enable the embedded Web UI |
+| `WEB_UI_ROUTE_PREFIX` | `/ui` | URL prefix for all UI routes |
+| `WEB_UI_READONLY` | `false` | Disable all control actions (monitoring only) |
+| `WEB_UI_USERNAME` | `admin` | Login username |
+| `WEB_UI_PASSWORD` | `change_me_strong_password` | Login password |
+| `WEB_UI_SESSION_SECRET` | `change_me…` | Secret for signing session cookies (min 32 chars) |
+| `WEB_UI_PAGE_REFRESH_SECONDS` | `5` | HTMX polling interval for live updates |
+| `WEB_UI_ALLOW_START_STOP` | `true` | Expose start/stop/pause/resume buttons |
+| `WEB_UI_ALLOW_EMERGENCY_STOP` | `true` | Expose the emergency stop button |
+| `WEB_UI_CONFIRM_LIVE_ACTIONS` | `true` | Require confirmation for actions in live mode |
+
+### What the UI Provides
+
+The operator dashboard shows:
+- **Bot Status** — current state (RUNNING / PAUSED / STOPPED / SAFE_MODE), uptime, market feed lag
+- **Balances** — free USDT, free BTC, estimated equity
+- **Open Position** — entry price, stop, target, unrealised PnL, lifetime
+- **Performance Metrics** — daily PnL, cumulative PnL, win rate, max drawdown
+- **Risk Guard** — daily trade count, consecutive losses, safe mode flag
+- **Control Buttons** — Start, Pause, Resume, Stop, Emergency Stop (with confirmation)
+- **Recent Events** — audit trail of system events
+- **Trades History** — closed positions with PnL breakdown
+
+### Operational Flow
+
+| Goal | Action |
+|---|---|
+| Start the bot | Click **Start** on Dashboard → Bot Control |
+| Pause new entries | Click **Pause** (exits still monitored) |
+| Resume after pause | Click **Resume** |
+| Graceful shutdown | Click **Stop** (requires confirmation) |
+| Emergency halt | Click **Emergency Stop** → Confirm (always requires confirmation) |
+| Monitor only | Set `WEB_UI_READONLY=true` — buttons are disabled |
+
+### Read-Only Mode
+
+Set `WEB_UI_READONLY=true` to disable all control actions. The dashboard remains fully functional for monitoring. A banner clearly labels the interface as **READ ONLY MODE**.
+
+---
+
 ## Project Structure
 
 ```
@@ -311,10 +388,18 @@ bobrito/
 │   ├── persistence/      # SQLAlchemy models + DB manager
 │   ├── api/              # FastAPI app + routes
 │   ├── monitoring/       # Loguru logging + Prometheus metrics
-│   └── engine/           # Bot orchestrator
+│   ├── engine/           # Bot orchestrator
+│   └── ui/               # Optional Web UI (FastAPI + Jinja2 + HTMX)
+│       ├── routes.py         # HTML pages, HTMX partials, action routes
+│       ├── services.py       # UI data aggregation
+│       ├── viewmodels.py     # Template-specific data structures
+│       ├── auth.py           # Session-based authentication
+│       ├── dependencies.py   # FastAPI DI helpers
+│       ├── templates/        # Jinja2 HTML templates
+│       └── static/           # CSS + JS assets
 ├── tests/
-│   ├── unit/             # Pure function tests
-│   └── integration/      # Pipeline tests
+│   ├── unit/             # Pure function + UI auth/viewmodel tests
+│   └── integration/      # Pipeline + UI route tests
 ├── alembic/              # Database migrations
 ├── docker/               # Prometheus config
 ├── .env.example
@@ -334,6 +419,9 @@ bobrito/
 5. **Initial capital is 200 USDT** — the bot will never risk more than configured in `RISK_PER_TRADE_PCT`.
 6. **Review daily loss limits** — `MAX_DAILY_LOSS_PCT=3%` means a maximum drawdown of 6 USDT per day on 200 USDT capital.
 7. **Futures and leverage are disabled** — v1 is spot-only with no margin.
+8. **Do not expose the Web UI publicly** without authentication. Use `WEB_UI_USERNAME` / `WEB_UI_PASSWORD` and set a strong `WEB_UI_SESSION_SECRET`.
+9. **Start in paper mode** before enabling the UI in production — `BOT_MODE=paper` lets you verify the dashboard works correctly without risk.
+10. **Live mode is clearly marked** in the UI with a red warning banner on every page.
 
 ---
 

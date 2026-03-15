@@ -1,0 +1,47 @@
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5">
+  <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-4">Performance Metrics</h3>
+
+  {% if metrics_vm %}
+  <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+    <div>
+      <p class="text-slate-500 text-xs mb-0.5">Daily PnL</p>
+      <p class="font-bold font-mono {{ metrics_vm.daily_pnl_class }}">
+        {% if metrics_vm.daily_pnl >= 0 %}+{% endif %}{{ "%.4f"|format(metrics_vm.daily_pnl) }}
+      </p>
+    </div>
+    <div>
+      <p class="text-slate-500 text-xs mb-0.5">Total PnL</p>
+      <p class="font-bold font-mono {{ metrics_vm.total_pnl_class }}">
+        {% if metrics_vm.total_pnl >= 0 %}+{% endif %}{{ "%.4f"|format(metrics_vm.total_pnl) }}
+      </p>
+    </div>
+    <div>
+      <p class="text-slate-500 text-xs mb-0.5">Total Trades</p>
+      <p class="font-semibold text-slate-200">{{ metrics_vm.total_trades }}</p>
+    </div>
+    <div>
+      <p class="text-slate-500 text-xs mb-0.5">Win Rate</p>
+      <p class="font-semibold {% if metrics_vm.win_rate >= 50 %}text-green-400{% else %}text-slate-200{% endif %}">
+        {{ "%.1f"|format(metrics_vm.win_rate) }}%
+      </p>
+    </div>
+    <div>
+      <p class="text-slate-500 text-xs mb-0.5">Wins / Losses</p>
+      <p class="text-slate-200">
+        <span class="text-green-400">{{ metrics_vm.wins }}</span>
+        <span class="text-slate-500"> / </span>
+        <span class="text-red-400">{{ metrics_vm.losses }}</span>
+      </p>
+    </div>
+    <div>
+      <p class="text-slate-500 text-xs mb-0.5">Max Drawdown</p>
+      <p class="font-semibold {% if metrics_vm.max_drawdown > 5 %}text-red-400{% else %}text-slate-200{% endif %}">
+        {{ "%.2f"|format(metrics_vm.max_drawdown) }}%
+      </p>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="text-slate-500 text-sm">Metrics not available</div>
+  {% endif %}
+</div>

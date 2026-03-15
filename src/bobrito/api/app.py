@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from bobrito.api.deps import set_bot
 from bobrito.api.routes import bot, health, trading
@@ -62,6 +64,8 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    settings = get_settings()
+
     app = FastAPI(
         title="Bobrito Trading Bot API",
         description="Automated BTC/USDT Spot Trading Bot",
@@ -77,7 +81,36 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Routers
+    # ── Optional Web UI ───────────────────────────────────────────────────────
+    if settings.web_ui_enabled:
+        from starlette.middleware.sessions import SessionMiddleware
+
+        from bobrito.ui.routes import create_ui_router
+
+        app.add_middleware(
+            SessionMiddleware,
+            secret_key=settings.web_ui_session_secret,
+            session_cookie="bobrito_session",
+            max_age=3600 * 8,  # 8-hour sessions
+            https_only=False,  # set True behind HTTPS proxy
+            same_site="lax",
+        )
+
+        ui_router = create_ui_router(settings)
+        app.include_router(ui_router)
+
+        static_dir = Path(__file__).parent.parent / "ui" / "static"
+        prefix = settings.web_ui_route_prefix.rstrip("/")
+        app.mount(f"{prefix}/static", StaticFiles(directory=str(static_dir)), name="ui_static")
+
+        log.info(
+            f"Web UI enabled | prefix={settings.web_ui_route_prefix} "
+            f"readonly={settings.web_ui_readonly}"
+        )
+    else:
+        log.info("Web UI disabled (WEB_UI_ENABLED=false)")
+
+    # ── Core API Routers ──────────────────────────────────────────────────────
     app.include_router(health.router)
     app.include_router(bot.router)
     app.include_router(trading.router)

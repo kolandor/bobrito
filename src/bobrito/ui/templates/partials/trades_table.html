@@ -1,0 +1,57 @@
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5">
+  <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-4">Recent Trades</h3>
+
+  {% if trades %}
+  <div class="overflow-x-auto -mx-1">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-slate-500 text-xs uppercase tracking-wider">
+          <th class="text-left pb-2 px-1 font-medium">#</th>
+          <th class="text-left pb-2 px-1 font-medium">Symbol</th>
+          <th class="text-right pb-2 px-1 font-medium">Entry</th>
+          <th class="text-right pb-2 px-1 font-medium">Exit</th>
+          <th class="text-right pb-2 px-1 font-medium">Qty</th>
+          <th class="text-right pb-2 px-1 font-medium">Net PnL</th>
+          <th class="text-left pb-2 px-1 font-medium">Reason</th>
+          <th class="text-left pb-2 px-1 font-medium">Closed</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-700/40">
+        {% for t in trades %}
+        <tr class="hover:bg-slate-700/30 transition-colors">
+          <td class="py-2 px-1 text-slate-500 text-xs font-mono">{{ t.id }}</td>
+          <td class="py-2 px-1 text-slate-300 font-mono text-xs">{{ t.symbol }}</td>
+          <td class="py-2 px-1 text-right text-slate-300 font-mono text-xs">
+            {% if t.entry_price %}${{ "%.2f"|format(t.entry_price) }}{% else %}—{% endif %}
+          </td>
+          <td class="py-2 px-1 text-right text-slate-300 font-mono text-xs">
+            {% if t.exit_price %}${{ "%.2f"|format(t.exit_price) }}{% else %}—{% endif %}
+          </td>
+          <td class="py-2 px-1 text-right text-slate-400 font-mono text-xs">{{ "%.6f"|format(t.quantity) }}</td>
+          <td class="py-2 px-1 text-right font-mono text-xs font-semibold {{ t.pnl_class }}">
+            {% if t.net_pnl is not none %}
+              {% if t.net_pnl >= 0 %}+{% endif %}{{ "%.4f"|format(t.net_pnl) }}
+            {% else %}—{% endif %}
+          </td>
+          <td class="py-2 px-1">
+            <span class="text-xs px-1.5 py-0.5 rounded
+              {% if t.exit_reason == 'TAKE_PROFIT' %}bg-green-900/40 text-green-400
+              {% elif t.exit_reason == 'STOP_LOSS' %}bg-red-900/40 text-red-400
+              {% elif t.exit_reason == 'EMERGENCY' %}bg-orange-900/40 text-orange-400
+              {% else %}bg-slate-700/60 text-slate-400{% endif %}">
+              {{ t.exit_reason or '—' }}
+            </span>
+          </td>
+          <td class="py-2 px-1 text-slate-500 text-xs">{{ t.closed_at or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-8 text-center">
+    <p class="text-slate-500 text-sm">No closed trades yet</p>
+  </div>
+  {% endif %}
+</div>

@@ -1,0 +1,50 @@
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5">
+  <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-4">Balances</h3>
+
+  {% if balances_vm and not balances_vm.error %}
+  <div class="space-y-3">
+    <div class="flex justify-between items-baseline">
+      <span class="text-slate-500 text-sm">Free USDT</span>
+      <span class="text-white text-lg font-semibold font-mono">{{ "%.2f"|format(balances_vm.free_usdt) }}</span>
+    </div>
+    <div class="flex justify-between items-baseline">
+      <span class="text-slate-500 text-sm">Free BTC</span>
+      <span class="text-slate-200 font-mono">{{ "%.6f"|format(balances_vm.free_btc) }}</span>
+    </div>
+    {% if balances_vm.locked_usdt > 0 %}
+    <div class="flex justify-between items-baseline">
+      <span class="text-slate-500 text-sm">Locked USDT</span>
+      <span class="text-slate-400 font-mono text-sm">{{ "%.2f"|format(balances_vm.locked_usdt) }}</span>
+    </div>
+    {% endif %}
+    {% if balances_vm.locked_btc > 0 %}
+    <div class="flex justify-between items-baseline">
+      <span class="text-slate-500 text-sm">Locked BTC</span>
+      <span class="text-slate-400 font-mono text-sm">{{ "%.6f"|format(balances_vm.locked_btc) }}</span>
+    </div>
+    {% endif %}
+    {% if balances_vm.btc_price %}
+    <div class="pt-2 border-t border-slate-700/60">
+      <div class="flex justify-between items-baseline">
+        <span class="text-slate-500 text-sm">BTC price</span>
+        <span class="text-slate-400 font-mono text-sm">${{ "%.2f"|format(balances_vm.btc_price) }}</span>
+      </div>
+    </div>
+    {% endif %}
+    {% if balances_vm.equity_usdt is not none %}
+    <div class="pt-2 border-t border-slate-700/60">
+      <div class="flex justify-between items-baseline">
+        <span class="text-slate-500 text-sm font-semibold">Est. Equity</span>
+        <span class="text-white font-bold font-mono">${{ "%.2f"|format(balances_vm.equity_usdt) }}</span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% elif balances_vm and balances_vm.error %}
+  <div class="text-slate-500 text-sm">{{ balances_vm.error }}</div>
+
+  {% else %}
+  <div class="text-slate-500 text-sm">Broker not available</div>
+  {% endif %}
+</div>

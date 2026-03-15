@@ -1,0 +1,42 @@
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5">
+  <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-4">Recent System Events</h3>
+
+  {% if events %}
+  <div class="overflow-x-auto -mx-1">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-slate-500 text-xs uppercase tracking-wider">
+          <th class="text-left pb-2 px-1 font-medium">Timestamp</th>
+          <th class="text-left pb-2 px-1 font-medium">Event</th>
+          <th class="text-left pb-2 px-1 font-medium">Description</th>
+          <th class="text-left pb-2 px-1 font-medium">Mode</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-700/40">
+        {% for ev in events %}
+        <tr class="hover:bg-slate-700/30 transition-colors">
+          <td class="py-2 px-1 text-slate-500 text-xs font-mono whitespace-nowrap">{{ ev.created_at }}</td>
+          <td class="py-2 px-1 whitespace-nowrap">
+            <span class="text-xs font-semibold {{ ev.event_class }}">{{ ev.event_type }}</span>
+          </td>
+          <td class="py-2 px-1 text-slate-400 text-xs max-w-xs truncate">{{ ev.description or '—' }}</td>
+          <td class="py-2 px-1">
+            <span class="text-xs px-1.5 py-0.5 rounded font-mono
+              {% if ev.mode == 'live' %}bg-red-900/40 text-red-400
+              {% elif ev.mode == 'testnet' %}bg-yellow-900/40 text-yellow-400
+              {% else %}bg-blue-900/40 text-blue-400{% endif %}">
+              {{ ev.mode }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-8 text-center">
+    <p class="text-slate-500 text-sm">No system events recorded</p>
+  </div>
+  {% endif %}
+</div>

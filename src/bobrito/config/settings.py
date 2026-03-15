@@ -38,13 +38,13 @@ class Settings(BaseSettings):
     binance_testnet_api_key: str = ""
     binance_testnet_api_secret: str = ""
     binance_testnet_rest_url: str = "https://testnet.binance.vision"
-    binance_testnet_ws_url: str = "wss://testnet.binance.vision/ws"
+    binance_testnet_ws_url: str = "wss://testnet.binance.vision"
 
     # ── Binance Live ──────────────────────────────────────────────────────────
     binance_live_api_key: str = ""
     binance_live_api_secret: str = ""
     binance_live_rest_url: str = "https://api.binance.com"
-    binance_live_ws_url: str = "wss://stream.binance.com:9443/ws"
+    binance_live_ws_url: str = "wss://stream.binance.com:9443"
 
     # ── Safety gate ───────────────────────────────────────────────────────────
     live_trading_enabled: bool = False
@@ -89,6 +89,24 @@ class Settings(BaseSettings):
 
     # ── Prometheus ────────────────────────────────────────────────────────────
     metrics_port: int = 9090
+
+    # ── Web UI ────────────────────────────────────────────────────────────────
+    web_ui_enabled: bool = False
+    web_ui_route_prefix: str = "/ui"
+    web_ui_readonly: bool = False
+    web_ui_page_refresh_seconds: int = 5
+
+    # UI session-based authentication
+    web_ui_username: str = "admin"
+    web_ui_password: str = "change_me_strong_password"
+    web_ui_session_secret: str = "change_me_very_long_random_secret_32chars"
+
+    # UI feature flags
+    web_ui_show_debug_blocks: bool = False
+    web_ui_show_raw_metrics: bool = False
+    web_ui_allow_emergency_stop: bool = True
+    web_ui_allow_start_stop: bool = True
+    web_ui_confirm_live_actions: bool = True
 
     # ── Validators ───────────────────────────────────────────────────────────
     @field_validator("bot_mode", mode="before")

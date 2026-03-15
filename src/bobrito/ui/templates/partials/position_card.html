@@ -1,0 +1,47 @@
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5">
+  <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-4">Open Position</h3>
+
+  {% if position_vm and position_vm.has_position %}
+  <div class="flex items-center gap-2 mb-4">
+    <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+    <span class="text-green-400 font-semibold text-sm">OPEN — {{ position_vm.symbol }} {{ position_vm.side }}</span>
+  </div>
+
+  <div class="space-y-2.5 text-sm">
+    <div class="flex justify-between items-baseline">
+      <span class="text-slate-500">Entry price</span>
+      <span class="text-slate-200 font-mono">${{ "%.2f"|format(position_vm.entry_price) }}</span>
+    </div>
+    <div class="flex justify-between items-baseline">
+      <span class="text-slate-500">Quantity</span>
+      <span class="text-slate-200 font-mono">{{ "%.6f"|format(position_vm.quantity) }} BTC</span>
+    </div>
+    <div class="flex justify-between items-baseline">
+      <span class="text-slate-500">Stop</span>
+      <span class="text-red-400 font-mono">${{ "%.2f"|format(position_vm.stop_price) }}</span>
+    </div>
+    <div class="flex justify-between items-baseline">
+      <span class="text-slate-500">Target</span>
+      <span class="text-green-400 font-mono">${{ "%.2f"|format(position_vm.target_price) }}</span>
+    </div>
+    <div class="pt-2 border-t border-slate-700/60 flex justify-between items-baseline">
+      <span class="text-slate-500">Unrealised PnL</span>
+      <span class="font-bold font-mono {{ position_vm.pnl_class }}">
+        {% if position_vm.unrealised_pnl >= 0 %}+{% endif %}{{ "%.4f"|format(position_vm.unrealised_pnl) }} USDT
+      </span>
+    </div>
+    <div class="flex justify-between items-baseline">
+      <span class="text-slate-500">Lifetime</span>
+      <span class="text-slate-400">{{ position_vm.lifetime_formatted }}</span>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-6 text-center">
+    <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center mb-3">
+      <span class="text-slate-500 text-sm">—</span>
+    </div>
+    <p class="text-slate-500 text-sm">No open position</p>
+  </div>
+  {% endif %}
+</div>

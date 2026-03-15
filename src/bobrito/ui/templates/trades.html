@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Trades History{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+  <h2 class="text-lg font-semibold text-white">Trades History</h2>
+  <p class="text-slate-500 text-sm">Closed positions — most recent first</p>
+</div>
+
+<div hx-get="{{ prefix }}/partials/trades-table"
+     hx-trigger="load, every {{ refresh_seconds }}s"
+     hx-swap="innerHTML">
+  {% include "partials/_loading_card.html" %}
+</div>
+{% endblock %}

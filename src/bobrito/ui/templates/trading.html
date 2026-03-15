@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Trading Overview{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+  <h2 class="text-lg font-semibold text-white">Trading Overview</h2>
+  <p class="text-slate-500 text-sm">Current position, balances and market data status</p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+  <div hx-get="{{ prefix }}/partials/position"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+
+  <div hx-get="{{ prefix }}/partials/balances"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <div hx-get="{{ prefix }}/partials/metrics"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+
+  <div hx-get="{{ prefix }}/partials/system-status"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+</div>
+{% endblock %}
