@@ -64,10 +64,20 @@
   </div>
 </div>
 
-<!-- ── Row 4: Recent Events ───────────────────────────────────────────────── -->
-<div hx-get="{{ prefix }}/partials/events-table"
-     hx-trigger="load, every {{ refresh_seconds }}s"
-     hx-swap="innerHTML">
-  {% include "partials/_loading_card.html" %}
+<!-- ── Row 4: Recent Trades | Recent Events ────────────────────────────────── -->
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+  <div hx-get="{{ prefix }}/partials/trades-table"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+
+  <div hx-get="{{ prefix }}/partials/events-table"
+       hx-trigger="load, every {{ refresh_seconds }}s"
+       hx-swap="innerHTML">
+    {% include "partials/_loading_card.html" %}
+  </div>
+
 </div>
 {% endblock %}

@@ -112,6 +112,11 @@ class TradingBot:
             on_snapshot=self._on_snapshot,
         )
 
+        # Bootstrap cumulative and daily stats from DB so the dashboard
+        # always reflects lifetime results, not just the current session.
+        await self._portfolio.load_historical_stats()
+        await self._risk.load_daily_stats()
+
         await self._feed.start()
         self._start_time = time.time()
         self._status = BotStatus.RUNNING

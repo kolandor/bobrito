@@ -15,6 +15,8 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 
+from sqlalchemy import case, func, select
+
 from bobrito.config.settings import Settings
 from bobrito.execution.base import OrderResult
 from bobrito.monitoring.logger import get_logger
@@ -74,6 +76,40 @@ class PortfolioManager:
         self._total_pnl: float = 0.0
         self._peak_equity: float = settings.initial_capital_usdt
         self._max_drawdown_pct: float = 0.0
+
+    # ── Startup bootstrap ─────────────────────────────────────────────────
+
+    async def load_historical_stats(self) -> None:
+        """Seed in-memory counters from closed positions stored in the database.
+
+        Called once at bot startup so the dashboard always shows lifetime
+        totals, not just the totals for the current process run.
+        """
+        async with self._db.session() as sess:
+            result = await sess.execute(
+                select(
+                    func.count(DBPosition.id).label("total"),
+                    func.coalesce(func.sum(DBPosition.net_pnl), 0.0).label("total_pnl"),
+                    func.coalesce(
+                        func.sum(case((DBPosition.net_pnl > 0, 1), else_=0)), 0
+                    ).label("wins"),
+                    func.coalesce(
+                        func.sum(case((DBPosition.net_pnl <= 0, 1), else_=0)), 0
+                    ).label("losses"),
+                ).where(DBPosition.status == PositionStatus.CLOSED)
+            )
+            row = result.one()
+
+        self._total_trades = int(row.total or 0)
+        self._total_pnl = float(row.total_pnl or 0.0)
+        self._wins = int(row.wins or 0)
+        self._losses = int(row.losses or 0)
+
+        log.info(
+            f"Historical stats loaded from DB: trades={self._total_trades} "
+            f"wins={self._wins} losses={self._losses} "
+            f"total_pnl={self._total_pnl:.4f} USDT"
+        )
 
     # ── Accessors ─────────────────────────────────────────────────────────
 

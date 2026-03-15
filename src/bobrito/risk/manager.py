@@ -21,11 +21,15 @@ import math
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
+from sqlalchemy import func, select
+
 from bobrito.config.settings import Settings
 from bobrito.monitoring.logger import get_logger
 from bobrito.monitoring.metrics import MetricsCollector
 from bobrito.persistence.database import DatabaseManager
 from bobrito.persistence.models import (
+    Position,
+    PositionStatus,
     RiskEvent,
     RiskEventType,
 )
@@ -74,6 +78,60 @@ class RiskManager:
         self._step_size: float = STEP_SIZE
         self._min_qty: float = MIN_QTY
         self._min_notional: float = MIN_NOTIONAL
+
+    # ── Startup bootstrap ─────────────────────────────────────────────────
+
+    async def load_daily_stats(self) -> None:
+        """Seed today's in-memory risk counters from closed positions in the DB.
+
+        Restores daily_trades, daily_pnl, and the consecutive-loss streak so
+        that risk limits remain correct after a process restart.
+        """
+        today = date.today()
+        today_start = datetime.combine(today, datetime.min.time())
+
+        async with self._db.session() as sess:
+            # Today's closed trade count and realised PnL
+            agg = await sess.execute(
+                select(
+                    func.count(Position.id).label("trades"),
+                    func.coalesce(func.sum(Position.net_pnl), 0.0).label("pnl"),
+                ).where(
+                    Position.status == PositionStatus.CLOSED,
+                    Position.closed_at >= today_start,
+                )
+            )
+            row = agg.one()
+            self._daily_trades = int(row.trades or 0)
+            self._daily_realised_pnl = float(row.pnl or 0.0)
+
+            # Consecutive loss streak: walk backward through the most recent
+            # closed trades until we hit a winner or run out of rows.
+            recent = await sess.execute(
+                select(Position.net_pnl, Position.closed_at)
+                .where(Position.status == PositionStatus.CLOSED)
+                .order_by(Position.closed_at.desc())
+                .limit(self._s.max_consecutive_losses + 10)
+            )
+            streak = 0
+            last_loss_time: datetime | None = None
+            for pnl, closed_at in recent.all():
+                if pnl is not None and pnl < 0:
+                    streak += 1
+                    if last_loss_time is None:
+                        last_loss_time = closed_at
+                else:
+                    break
+            self._consecutive_losses = streak
+            if last_loss_time is not None:
+                self._last_loss_time = last_loss_time
+
+        self._current_day = today
+        log.info(
+            f"Daily risk stats loaded from DB: trades={self._daily_trades} "
+            f"pnl={self._daily_realised_pnl:.4f} USDT "
+            f"consecutive_losses={self._consecutive_losses}"
+        )
 
     # ── Configuration ─────────────────────────────────────────────────────
 
