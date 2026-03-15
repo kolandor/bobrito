@@ -26,6 +26,7 @@ from bobrito.execution.binance import BinanceBroker
 from bobrito.execution.paper import PaperBroker
 from bobrito.market_data.buffer import CandleBuffer
 from bobrito.market_data.feed import MarketDataFeed
+from bobrito.market_data.history import BINANCE_PUBLIC_REST, HistoricalLoader
 from bobrito.market_data.models import MarketSnapshot
 from bobrito.monitoring.logger import get_logger
 from bobrito.monitoring.metrics import MetricsCollector
@@ -102,6 +103,9 @@ class TradingBot:
             self._risk.configure_filters(**filters)
         except Exception as exc:
             log.warning(f"Could not fetch exchange filters: {exc}. Using defaults.")
+
+        # ── Historical pre-fill (eliminates EMA warm-up blind period) ────────
+        await self._prefill_candle_buffers()
 
         ws_url = self._s.active_ws_url()
         self._feed = MarketDataFeed(
@@ -459,6 +463,33 @@ class TradingBot:
                 api_secret=s.binance_live_api_secret,
                 base_url=s.binance_live_rest_url,
                 mode="live",
+            )
+
+    async def _prefill_candle_buffers(self) -> None:
+        """Download historical candles from Binance REST and pre-fill buffers.
+
+        Uses the public klines endpoint — no API key required.
+        Falls back gracefully if the request fails so the bot still starts
+        (it will just need to warm up from the live stream instead).
+        """
+        loader = HistoricalLoader(
+            symbol=self._s.symbol,
+            rest_base_url=BINANCE_PUBLIC_REST,
+        )
+        try:
+            await loader.prefill(
+                buf1m=self._buf1,
+                buf5m=self._buf5,
+                limit=self._s.candle_buffer_size,
+            )
+            log.info(
+                f"Candle buffers ready: "
+                f"1m={len(self._buf1)} bars, 5m={len(self._buf5)} bars"
+            )
+        except Exception as exc:
+            log.warning(
+                f"Historical pre-fill failed: {exc}. "
+                "Bot will warm up from live stream instead."
             )
 
     async def _log_system_event(self, event_type: str, description: str = "") -> None:

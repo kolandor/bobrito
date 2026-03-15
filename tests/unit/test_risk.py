@@ -78,10 +78,13 @@ class TestPositionSizing:
         price = 40000.0
         stop = 39000.0
         stop_dist = price - stop   # = 1000
+        free_usdt = 1000.0
 
+        # Sizing is based on tradeable balance (free_usdt - min_free_balance)
+        # tradeable = 1000 - 0 = 1000 USDT
         # risk_amount = 1000 * 1% = 10 USDT
         # qty = 10 / 1000 = 0.01 BTC
-        qty, risk_amount = rm._calculate_position_size(price, stop_dist, free_usdt=500.0)
+        qty, risk_amount = rm._calculate_position_size(price, stop_dist, free_usdt=free_usdt)
         assert abs(risk_amount - 10.0) < 0.01
         assert abs(qty - 0.01) < 0.0001
 

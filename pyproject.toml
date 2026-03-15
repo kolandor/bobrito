@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bobrito"
-version = "1.1.0"
+version = "1.2"
 description = "Automated Trading Bot for Binance Spot BTC/USDT"
 requires-python = ">=3.11"
 dependencies = [
