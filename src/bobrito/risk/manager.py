@@ -257,6 +257,114 @@ class RiskManager:
             "current_day": str(self._current_day),
         }
 
+    def check_entry_blocks(self, free_usdt: float | None = None) -> list[dict]:
+        """Return all currently active entry-blocking conditions.
+
+        Synchronous and side-effect-free — reads in-memory counters only.
+        Each item is a dict with keys: type, name, reason, reset_tip, severity,
+        and optionally remaining_seconds (cooldown only).
+
+        Used by the UI layer to show accurate operational status.
+        """
+        blocks: list[dict] = []
+        s = self._s
+        now = datetime.utcnow()
+        is_new_day = date.today() != self._current_day
+
+        # Safe mode (survives restarts)
+        if self._safe_mode:
+            blocks.append({
+                "type": "safe_mode",
+                "name": "Safe Mode",
+                "reason": "A critical runtime error forced the bot into safe mode. All new entries are blocked.",
+                "reset_tip": "Restart the bot process to clear safe mode.",
+                "severity": "critical",
+            })
+
+        # Daily counters only apply for the current trading day
+        if not is_new_day:
+            capital = s.initial_capital_usdt
+            max_daily_loss = capital * s.max_daily_loss_pct / 100
+            if self._daily_realised_pnl <= -max_daily_loss:
+                blocks.append({
+                    "type": "daily_loss",
+                    "name": "Daily Loss Limit",
+                    "reason": (
+                        f"Today's realised loss ({abs(self._daily_realised_pnl):.4f} USDT) "
+                        f"reached the {s.max_daily_loss_pct}% daily limit "
+                        f"({max_daily_loss:.2f} USDT on {capital:.0f} USDT capital)."
+                    ),
+                    "reset_tip": "Resets automatically at midnight UTC (start of the next trading day).",
+                    "severity": "critical",
+                })
+
+            if self._daily_trades >= s.max_trades_per_day:
+                blocks.append({
+                    "type": "max_trades",
+                    "name": "Daily Trade Limit",
+                    "reason": (
+                        f"{self._daily_trades} trades executed today "
+                        f"(configured limit: {s.max_trades_per_day})."
+                    ),
+                    "reset_tip": "Resets automatically at midnight UTC (start of the next trading day).",
+                    "severity": "warning",
+                })
+
+        # Consecutive losses (persists across days)
+        if self._consecutive_losses >= s.max_consecutive_losses:
+            blocks.append({
+                "type": "consecutive_losses",
+                "name": "Consecutive Loss Limit",
+                "reason": (
+                    f"{self._consecutive_losses} consecutive losing trades "
+                    f"reached the limit of {s.max_consecutive_losses}."
+                ),
+                "reset_tip": (
+                    "Clears automatically after the next profitable trade closes. "
+                    f"Current losing streak: {self._consecutive_losses}."
+                ),
+                "severity": "warning",
+            })
+
+        # Cooldown timer
+        if self._last_loss_time and s.cooldown_minutes_after_losses > 0:
+            cooldown_end = self._last_loss_time + timedelta(
+                minutes=s.cooldown_minutes_after_losses
+            )
+            if now < cooldown_end:
+                remaining = int((cooldown_end - now).total_seconds())
+                mins, secs = divmod(remaining, 60)
+                blocks.append({
+                    "type": "cooldown",
+                    "name": "Post-Loss Cooldown",
+                    "reason": (
+                        f"Mandatory cooldown period is active after a losing trade. "
+                        f"{mins}m {secs:02d}s remaining out of "
+                        f"{s.cooldown_minutes_after_losses} min total."
+                    ),
+                    "reset_tip": f"Lifts automatically in {mins}m {secs:02d}s. No action needed.",
+                    "severity": "warning",
+                    "remaining_seconds": remaining,
+                })
+
+        # Minimum free balance (optional — only checked when balance is known)
+        if free_usdt is not None and free_usdt < s.min_free_balance_usdt:
+            blocks.append({
+                "type": "min_balance",
+                "name": "Minimum Balance Reserve",
+                "reason": (
+                    f"Free USDT ({free_usdt:.2f}) is below the required minimum "
+                    f"({s.min_free_balance_usdt:.2f} USDT)."
+                ),
+                "reset_tip": (
+                    "Recovers automatically when the open position is closed "
+                    "and USDT is returned to the account."
+                ),
+                "severity": "warning",
+            })
+
+        return blocks
+
     # ── Private helpers ───────────────────────────────────────────────────
 
     def _maybe_reset_daily(self) -> None:

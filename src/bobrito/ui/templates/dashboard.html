@@ -32,6 +32,14 @@
   </div>
 </div>
 
+<!-- ── Row 1b: Current Situation ──────────────────────────────────────────── -->
+<div class="mb-4"
+     hx-get="{{ prefix }}/partials/situation"
+     hx-trigger="load, every {{ refresh_seconds }}s"
+     hx-swap="innerHTML">
+  {% include "partials/_loading_card.html" %}
+</div>
+
 <!-- ── Row 2: Balances | Open Position ────────────────────────────────────── -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 

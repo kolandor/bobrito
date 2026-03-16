@@ -17,6 +17,7 @@
   </script>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="{{ prefix }}/static/css/app.css">
 </head>
 <body class="h-full bg-slate-950 text-slate-300 antialiased">
@@ -52,6 +53,7 @@
           <a href="{{ prefix }}/dashboard" class="px-3 py-1.5 text-sm rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">Dashboard</a>
           <a href="{{ prefix }}/trading" class="px-3 py-1.5 text-sm rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">Trading</a>
           <a href="{{ prefix }}/trades" class="px-3 py-1.5 text-sm rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">Trades</a>
+          <a href="{{ prefix }}/signals" class="px-3 py-1.5 text-sm rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">Signals</a>
           <a href="{{ prefix }}/system" class="px-3 py-1.5 text-sm rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">System</a>
           <form method="post" action="{{ prefix }}/logout" class="ml-3">
             <button type="submit" class="px-3 py-1.5 text-sm rounded-md text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors">

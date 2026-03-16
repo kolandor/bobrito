@@ -6,7 +6,7 @@ Architecture:
 
 Route groups:
   - Auth:     GET/POST /login, POST /logout
-  - Pages:    GET / (redirect), /dashboard, /trading, /trades, /system
+  - Pages:    GET / (redirect), /dashboard, /trading, /trades, /signals, /system
   - Partials: GET /partials/*  (HTMX polling targets)
   - Actions:  POST /actions/*  (bot control, protected + read-only aware)
 """
@@ -149,6 +149,38 @@ def create_ui_router(settings: Settings) -> APIRouter:
             return redir
         return _templates.TemplateResponse("system.html", _base_ctx(request))
 
+    @router.get("/signals", response_class=HTMLResponse)
+    async def signals_page(request: Request):
+        if redir := _require_auth(request):
+            return redir
+        return _templates.TemplateResponse("signals.html", _base_ctx(request))
+
+    @router.get("/signals/cards", response_class=HTMLResponse)
+    async def signals_cards(request: Request):
+        if err := _partial_auth_check(request):
+            return err
+        raw_type = request.query_params.get("type", "ALL").upper()
+        try:
+            offset = int(request.query_params.get("offset", "0"))
+        except ValueError:
+            offset = 0
+        db = get_db_manager()
+        bot = get_bot_optional()
+        svc = UIService(bot, settings)  # type: ignore[arg-type]
+        signals, has_more = await svc.get_signals_batch(
+            db, offset=offset, limit=30, signal_type=raw_type
+        )
+        return _templates.TemplateResponse(
+            "partials/signal_cards.html",
+            _base_ctx(
+                request,
+                signals=signals,
+                has_more=has_more,
+                next_offset=offset + 30,
+                signal_type=raw_type,
+            ),
+        )
+
     # ── HTMX Partial Routes ───────────────────────────────────────────────────
 
     @router.get("/partials/dashboard-status", response_class=HTMLResponse)
@@ -249,6 +281,23 @@ def create_ui_router(settings: Settings) -> APIRouter:
         return _templates.TemplateResponse(
             "partials/events_table.html",
             _base_ctx(request, events=events),
+        )
+
+    @router.get("/partials/situation", response_class=HTMLResponse)
+    async def partial_situation(request: Request):
+        if err := _partial_auth_check(request):
+            return err
+        bot = get_bot_optional()
+        situation_vm = None
+        if bot:
+            try:
+                db = get_db_manager()
+                situation_vm = await UIService(bot, settings).get_situation(db)
+            except Exception as exc:
+                log.debug(f"partial_situation error: {exc}")
+        return _templates.TemplateResponse(
+            "partials/situation.html",
+            _base_ctx(request, situation_vm=situation_vm),
         )
 
     @router.get("/partials/control-buttons", response_class=HTMLResponse)

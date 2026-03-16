@@ -1,0 +1,154 @@
+{% if not signals %}
+<div class="text-center py-16 text-slate-600">
+  <svg class="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+  </svg>
+  <p class="text-sm">No signals found</p>
+</div>
+
+{% else %}
+<div class="space-y-2" id="signals-cards-inner">
+
+{% for s in signals %}
+<div x-data="{ open: false }"
+     class="rounded-xl border transition-colors
+       {% if s.signal_type == 'BUY' %}border-green-800/50 bg-green-950/20 hover:border-green-700/60
+       {% elif s.signal_type == 'EXIT' %}border-orange-800/50 bg-orange-950/20 hover:border-orange-700/60
+       {% else %}border-slate-700/40 bg-slate-800/40 hover:border-slate-600/60{% endif %}">
+
+  <!-- ── Main row (clickable to expand explanation) ──────────────────────── -->
+  <div @click="open = !open"
+       class="grid grid-cols-12 gap-2 px-4 py-3 cursor-pointer select-none items-center">
+
+    <!-- Time -->
+    <div class="col-span-2">
+      <p class="text-slate-300 text-xs font-mono leading-tight">{{ s.created_at_full or s.timestamp }}</p>
+    </div>
+
+    <!-- Type badge -->
+    <div class="col-span-1">
+      <span class="inline-block text-xs font-bold px-1.5 py-0.5 rounded
+        {% if s.signal_type == 'BUY' %}bg-green-800/70 text-green-300
+        {% elif s.signal_type == 'EXIT' %}bg-orange-800/70 text-orange-300
+        {% else %}bg-slate-700/70 text-slate-400{% endif %}">
+        {{ s.signal_type }}
+      </span>
+    </div>
+
+    <!-- Price -->
+    <div class="col-span-2">
+      <p class="text-slate-200 font-mono text-sm">${{ "{:,.2f}".format(s.price) }}</p>
+    </div>
+
+    <!-- Indicators: EMA fast / EMA slow / ATR -->
+    <div class="col-span-2 text-xs leading-snug">
+      {% if s.ema_fast %}
+      <p class="text-amber-500 font-mono">F {{ "{:.2f}".format(s.ema_fast) }}</p>
+      {% endif %}
+      {% if s.ema_slow %}
+      <p class="text-red-500 font-mono">S {{ "{:.2f}".format(s.ema_slow) }}</p>
+      {% endif %}
+      {% if s.atr %}
+      <p class="text-slate-500 font-mono">ATR {{ "{:.2f}".format(s.atr) }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Levels: Stop / Target -->
+    <div class="col-span-2 text-xs leading-snug">
+      {% if s.stop_price %}
+      <p class="text-red-400 font-mono">SL {{ "{:,.2f}".format(s.stop_price) }}</p>
+      {% endif %}
+      {% if s.target_price %}
+      <p class="text-green-400 font-mono">TP {{ "{:,.2f}".format(s.target_price) }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Regime -->
+    <div class="col-span-1 text-center">
+      {% if s.regime %}
+      <span class="text-xs
+        {% if s.regime == 'TRENDING' %}text-cyan-400
+        {% elif s.regime == 'SIDEWAYS' %}text-slate-500
+        {% else %}text-slate-600{% endif %}">
+        {{ s.regime | title }}
+      </span>
+      {% else %}
+      <span class="text-slate-700 text-xs">—</span>
+      {% endif %}
+    </div>
+
+    <!-- Acted On -->
+    <div class="col-span-1 text-center">
+      {% if s.acted_on %}
+      <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-900/60">
+        <svg class="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+        </svg>
+      </span>
+      {% else %}
+      <span class="text-slate-700 text-xs">—</span>
+      {% endif %}
+    </div>
+
+    <!-- Expand chevron -->
+    <div class="col-span-1 flex justify-end">
+      <svg class="w-4 h-4 text-slate-600 transition-transform duration-150"
+           :class="open ? 'rotate-180' : ''"
+           fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+      </svg>
+    </div>
+
+  </div>
+
+  <!-- ── Explanation sub-row (collapsible) ──────────────────────────────── -->
+  <div x-show="open"
+       x-transition:enter="transition ease-out duration-150"
+       x-transition:enter-start="opacity-0 -translate-y-1"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-cloak
+       class="px-4 pb-4">
+    <div class="border-t pt-3
+      {% if s.signal_type == 'BUY' %}border-green-800/40
+      {% elif s.signal_type == 'EXIT' %}border-orange-800/40
+      {% else %}border-slate-700/40{% endif %}">
+      <p class="text-slate-400 text-sm leading-relaxed">{{ s.explanation_friendly }}</p>
+      {% if s.signal_type == 'BUY' and s.stop_price and s.target_price %}
+      <div class="flex flex-wrap gap-4 mt-3 text-xs font-mono">
+        <span class="text-slate-500">Entry: <span class="text-slate-300">${{ "{:,.2f}".format(s.price) }}</span></span>
+        <span class="text-slate-500">Stop: <span class="text-red-400">${{ "{:,.2f}".format(s.stop_price) }}</span></span>
+        <span class="text-slate-500">Target: <span class="text-green-400">${{ "{:,.2f}".format(s.target_price) }}</span></span>
+        {% if s.atr %}
+        <span class="text-slate-500">ATR: <span class="text-slate-400">{{ "{:.2f}".format(s.atr) }}</span></span>
+        {% endif %}
+        {% if s.stop_price and s.target_price %}
+        {% set rr = (s.target_price - s.price) / (s.price - s.stop_price) if s.price > s.stop_price else 0 %}
+        <span class="text-slate-500">R:R ≈ <span class="text-cyan-400">{{ "{:.1f}".format(rr) }}</span></span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endfor %}
+
+</div><!-- #signals-cards-inner -->
+
+<!-- ── Infinite scroll sentinel ──────────────────────────────────────────────── -->
+{% if has_more %}
+<div hx-get="{{ prefix }}/signals/cards?offset={{ next_offset }}&type={{ signal_type }}"
+     hx-trigger="revealed"
+     hx-swap="outerHTML"
+     class="py-8 flex items-center justify-center gap-2 text-slate-600 text-sm">
+  <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+  </svg>
+  Loading more signals…
+</div>
+{% else %}
+<p class="py-8 text-center text-slate-700 text-xs">— End of records —</p>
+{% endif %}
+
+{% endif %}

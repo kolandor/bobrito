@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Signals{% endblock %}
+
+{% block content %}
+<div class="mb-5 flex items-center justify-between">
+  <div>
+    <h2 class="text-lg font-semibold text-white">Signal History</h2>
+    <p class="text-slate-500 text-sm">Strategy evaluation log — newest first</p>
+  </div>
+</div>
+
+<!-- ── Filter bar + count ───────────────────────────────────────────────────── -->
+<div x-data="{ active: 'ALL' }" class="mb-5">
+
+  <div class="flex flex-wrap items-center gap-2">
+
+    {% set filters = [
+      ('ALL',  'All Signals',    'slate'),
+      ('BUY',  'Buy',            'green'),
+      ('EXIT', 'Exit',           'orange'),
+      ('HOLD', 'Hold',           'slate'),
+    ] %}
+
+    {% for val, label, color in filters %}
+    <button
+      @click="active = '{{ val }}'; htmx.ajax('GET', '{{ prefix }}/signals/cards?offset=0&type={{ val }}', {target:'#signals-list', swap:'innerHTML'})"
+      :class="active === '{{ val }}'
+        ? '{% if color == 'green' %}bg-green-800 text-green-200 border-green-600{% elif color == 'orange' %}bg-orange-800 text-orange-200 border-orange-600{% else %}bg-slate-600 text-white border-slate-400{% endif %}'
+        : 'bg-slate-800/70 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-slate-300'"
+      class="px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors">
+      {{ label }}
+    </button>
+    {% endfor %}
+
+    <!-- Live count badge -->
+    <span class="ml-auto text-xs text-slate-600 font-mono" id="signals-count"></span>
+  </div>
+
+  <!-- Column header bar -->
+  <div class="mt-4 grid grid-cols-12 gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-600 border-b border-slate-800">
+    <div class="col-span-2">Time</div>
+    <div class="col-span-1">Type</div>
+    <div class="col-span-2">Price</div>
+    <div class="col-span-2">Indicators</div>
+    <div class="col-span-2">Levels</div>
+    <div class="col-span-1 text-center">Regime</div>
+    <div class="col-span-1 text-center">Acted</div>
+    <div class="col-span-1">&nbsp;</div>
+  </div>
+
+</div>
+
+<!-- ── Signal list (HTMX target) ─────────────────────────────────────────────── -->
+<div id="signals-list"
+     hx-get="{{ prefix }}/signals/cards?offset=0&type=ALL"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+  <!-- Loading skeleton -->
+  <div class="space-y-2">
+    {% for _ in range(5) %}
+    <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl h-20 animate-pulse"></div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

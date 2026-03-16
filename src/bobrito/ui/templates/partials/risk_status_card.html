@@ -1,59 +1,141 @@
-<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5">
-  <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-4">Risk Guard</h3>
+{% set block_types = risk_vm.active_blocks | map(attribute='type') | list if risk_vm else [] %}
+{% set has_consec_block  = 'consecutive_losses' in block_types %}
+{% set has_trades_block  = 'max_trades' in block_types %}
+{% set has_loss_block    = 'daily_loss' in block_types %}
+{% set has_cooldown      = 'cooldown' in block_types %}
+{% set has_safe_mode     = 'safe_mode' in block_types %}
+
+<div class="bg-slate-800 border rounded-xl p-5
+  {% if risk_vm and risk_vm.active_blocks %}border-orange-700/60{% else %}border-slate-700/60{% endif %}">
+
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Risk Guard</h3>
+    {% if risk_vm and risk_vm.active_blocks %}
+    <span class="text-xs font-bold px-2 py-0.5 rounded bg-orange-900/50 text-orange-300 border border-orange-700/50">
+      {{ risk_vm.active_blocks | length }} BLOCK{{ 'S' if risk_vm.active_blocks | length > 1 else '' }}
+    </span>
+    {% else %}
+    <span class="text-xs font-semibold px-2 py-0.5 rounded bg-green-900/40 text-green-400 border border-green-700/40">
+      OK
+    </span>
+    {% endif %}
+  </div>
 
   {% if risk_vm %}
 
-  {% if risk_vm.safe_mode %}
-  <div class="bg-orange-950/60 border border-orange-700/60 rounded-lg px-3 py-2.5 mb-4">
-    <p class="text-orange-400 text-xs font-bold">⚠ SAFE MODE ACTIVE — All new entries blocked</p>
+  {% if has_safe_mode %}
+  <div class="bg-red-950/60 border border-red-700/60 rounded-lg px-3 py-2.5 mb-4">
+    <p class="text-red-400 text-xs font-bold">🔴 SAFE MODE — All new entries blocked</p>
+    <p class="text-slate-500 text-xs mt-1">Restart the bot process to clear.</p>
   </div>
   {% endif %}
 
   <div class="space-y-3 text-sm">
-    <div>
-      <div class="flex justify-between items-center mb-1">
-        <span class="text-slate-500 text-xs">Daily trades</span>
-        <span class="text-slate-300 text-xs font-mono">{{ risk_vm.daily_trades }} / {{ risk_vm.max_trades_per_day }}</span>
-      </div>
-      <div class="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-        <div class="h-full rounded-full transition-all
-          {% if risk_vm.daily_trades >= risk_vm.max_trades_per_day %}bg-red-500
-          {% elif risk_vm.daily_trades >= risk_vm.max_trades_per_day * 0.7 %}bg-yellow-500
-          {% else %}bg-blue-500{% endif %}"
-          style="width: {{ [([risk_vm.daily_trades / risk_vm.max_trades_per_day * 100, 0] | max), 100] | min }}%"></div>
-      </div>
-    </div>
 
+    <!-- ── Consecutive losses ───────────────────────────────────────────── -->
     <div>
       <div class="flex justify-between items-center mb-1">
-        <span class="text-slate-500 text-xs">Consecutive losses</span>
-        <span class="text-slate-300 text-xs font-mono">{{ risk_vm.consecutive_losses }} / {{ risk_vm.max_consecutive_losses }}</span>
+        <div class="flex items-center gap-1.5">
+          <span class="text-slate-500 text-xs">Consecutive losses</span>
+          {% if has_consec_block %}
+          <span class="text-xs font-bold px-1 py-0.5 rounded bg-red-900/60 text-red-300 border border-red-700/50">BLOCKED</span>
+          {% endif %}
+        </div>
+        <span class="font-mono text-xs
+          {% if has_consec_block %}text-red-400
+          {% elif risk_vm.consecutive_losses >= risk_vm.max_consecutive_losses - 1 %}text-yellow-400
+          {% else %}text-slate-300{% endif %}">
+          {{ risk_vm.consecutive_losses }} / {{ risk_vm.max_consecutive_losses }}
+        </span>
       </div>
       <div class="h-1.5 bg-slate-700 rounded-full overflow-hidden">
         <div class="h-full rounded-full transition-all
-          {% if risk_vm.consecutive_losses >= risk_vm.max_consecutive_losses %}bg-red-500
+          {% if has_consec_block %}bg-red-500
           {% elif risk_vm.consecutive_losses >= risk_vm.max_consecutive_losses - 1 %}bg-yellow-500
           {% else %}bg-green-500{% endif %}"
-          style="width: {{ [([risk_vm.consecutive_losses / risk_vm.max_consecutive_losses * 100, 0] | max), 100] | min }}%"></div>
+          style="width: {{ [[risk_vm.consecutive_losses / risk_vm.max_consecutive_losses * 100, 0] | max, 100] | min }}%"></div>
       </div>
+      {% if has_consec_block %}
+      {% for b in risk_vm.active_blocks if b.type == 'consecutive_losses' %}
+      <p class="text-slate-500 text-xs mt-1 italic">↩ {{ b.reset_tip }}</p>
+      {% endfor %}
+      {% endif %}
     </div>
 
+    <!-- ── Daily trades ──────────────────────────────────────────────────── -->
+    <div>
+      <div class="flex justify-between items-center mb-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-slate-500 text-xs">Daily trades</span>
+          {% if has_trades_block %}
+          <span class="text-xs font-bold px-1 py-0.5 rounded bg-orange-900/60 text-orange-300 border border-orange-700/50">BLOCKED</span>
+          {% endif %}
+        </div>
+        <span class="font-mono text-xs
+          {% if has_trades_block %}text-orange-400
+          {% elif risk_vm.daily_trades >= risk_vm.max_trades_per_day * 0.7 %}text-yellow-400
+          {% else %}text-slate-300{% endif %}">
+          {{ risk_vm.daily_trades }} / {{ risk_vm.max_trades_per_day }}
+        </span>
+      </div>
+      <div class="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+        <div class="h-full rounded-full transition-all
+          {% if has_trades_block %}bg-red-500
+          {% elif risk_vm.daily_trades >= risk_vm.max_trades_per_day * 0.7 %}bg-yellow-500
+          {% else %}bg-blue-500{% endif %}"
+          style="width: {{ [[risk_vm.daily_trades / risk_vm.max_trades_per_day * 100, 0] | max, 100] | min }}%"></div>
+      </div>
+      {% if has_trades_block %}
+      {% for b in risk_vm.active_blocks if b.type == 'max_trades' %}
+      <p class="text-slate-500 text-xs mt-1 italic">↩ {{ b.reset_tip }}</p>
+      {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- ── Cooldown timer ───────────────────────────────────────────────── -->
+    {% if has_cooldown %}
+    {% for b in risk_vm.active_blocks if b.type == 'cooldown' %}
+    <div class="rounded-lg border border-orange-800/50 bg-orange-950/25 px-3 py-2">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold text-orange-400">Post-Loss Cooldown</span>
+        <span class="text-xs font-bold px-1 py-0.5 rounded bg-orange-900/60 text-orange-300 border border-orange-700/50">ACTIVE</span>
+      </div>
+      <p class="text-slate-400 text-xs mt-1">{{ b.reason }}</p>
+      <p class="text-slate-500 text-xs mt-0.5 italic">↩ {{ b.reset_tip }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- ── Stats ──────────────────────────────────────────────────────────── -->
     <div class="pt-2 border-t border-slate-700/60 space-y-1.5">
       <div class="flex justify-between items-center">
-        <span class="text-slate-500 text-xs">Daily PnL</span>
+        <div class="flex items-center gap-1.5">
+          <span class="text-slate-500 text-xs">Daily PnL</span>
+          {% if has_loss_block %}
+          <span class="text-xs font-bold px-1 py-0.5 rounded bg-red-900/60 text-red-300 border border-red-700/50">BLOCKED</span>
+          {% endif %}
+        </div>
         <span class="font-mono text-xs {% if risk_vm.daily_pnl < 0 %}text-red-400{% elif risk_vm.daily_pnl > 0 %}text-green-400{% else %}text-slate-400{% endif %}">
           {% if risk_vm.daily_pnl >= 0 %}+{% endif %}{{ "%.4f"|format(risk_vm.daily_pnl) }} USDT
         </span>
       </div>
+      {% if has_loss_block %}
+      {% for b in risk_vm.active_blocks if b.type == 'daily_loss' %}
+      <p class="text-red-500/80 text-xs italic">{{ b.reason }}</p>
+      <p class="text-slate-500 text-xs italic">↩ {{ b.reset_tip }}</p>
+      {% endfor %}
+      {% endif %}
       <div class="flex justify-between items-center">
         <span class="text-slate-500 text-xs">Trading day</span>
         <span class="text-slate-400 text-xs">{{ risk_vm.current_day }}</span>
       </div>
       <div class="flex justify-between items-center">
         <span class="text-slate-500 text-xs">Max daily loss</span>
-        <span class="text-slate-400 text-xs">{{ risk_vm.max_daily_loss_pct }}%</span>
+        {% set max_loss_usdt = risk_vm.initial_capital_usdt * risk_vm.max_daily_loss_pct / 100 %}
+        <span class="text-slate-400 text-xs">{{ risk_vm.max_daily_loss_pct }}% (~{{ "%.2f"|format(max_loss_usdt) }} USDT)</span>
       </div>
     </div>
+
   </div>
 
   {% else %}
