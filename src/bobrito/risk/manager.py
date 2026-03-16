@@ -79,6 +79,10 @@ class RiskManager:
         self._min_qty: float = MIN_QTY
         self._min_notional: float = MIN_NOTIONAL
 
+        # Runtime parameter overrides (take precedence over .env values).
+        # Cleared by restore_defaults() or on process restart.
+        self._overrides: dict[str, float | int] = {}
+
     # ── Startup bootstrap ─────────────────────────────────────────────────
 
     async def load_daily_stats(self) -> None:
@@ -149,6 +153,113 @@ class RiskManager:
             f"min_qty={min_qty}, min_notional={min_notional}"
         )
 
+    # ── Runtime parameter access ──────────────────────────────────────────
+
+    def _p(self, name: str):
+        """Return override value if set, else the .env default."""
+        return self._overrides.get(name, getattr(self._s, name))
+
+    def get_params(self) -> dict:
+        """Current effective parameters with per-field override metadata."""
+        keys = [
+            "max_consecutive_losses",
+            "max_daily_loss_pct",
+            "cooldown_minutes_after_losses",
+            "max_trades_per_day",
+            "min_free_balance_usdt",
+        ]
+        return {
+            k: {
+                "value": self._p(k),
+                "default": getattr(self._s, k),
+                "overridden": k in self._overrides,
+            }
+            for k in keys
+        }
+
+    def set_params(
+        self,
+        max_consecutive_losses: int | None = None,
+        max_daily_loss_pct: float | None = None,
+        cooldown_minutes_after_losses: int | None = None,
+        max_trades_per_day: int | None = None,
+        min_free_balance_usdt: float | None = None,
+    ) -> dict:
+        """Override one or more risk parameters at runtime.
+
+        Only non-None arguments are changed. Returns the updated params dict.
+        Overrides persist until ``restore_defaults()`` is called or the
+        process restarts.
+        """
+        mapping = {
+            "max_consecutive_losses": max_consecutive_losses,
+            "max_daily_loss_pct": max_daily_loss_pct,
+            "cooldown_minutes_after_losses": cooldown_minutes_after_losses,
+            "max_trades_per_day": max_trades_per_day,
+            "min_free_balance_usdt": min_free_balance_usdt,
+        }
+        changed = [f"{k}={v}" for k, v in mapping.items() if v is not None]
+        for k, v in mapping.items():
+            if v is not None:
+                self._overrides[k] = v
+        if changed:
+            log.info(f"Risk params overridden: {', '.join(changed)}")
+        return self.get_params()
+
+    def restore_defaults(self) -> dict:
+        """Clear all runtime overrides — revert every parameter to its .env value."""
+        self._overrides.clear()
+        log.info("Risk params restored to .env defaults")
+        return self.get_params()
+
+    # ── Counter resets ────────────────────────────────────────────────────
+
+    def reset_cooldown(self) -> None:
+        """Manually clear the post-loss cooldown timer."""
+        self._last_loss_time = None
+        log.info("Cooldown timer manually reset")
+
+    def reset_consecutive_losses(self) -> None:
+        """Manually reset the consecutive-loss streak to zero."""
+        self._consecutive_losses = 0
+        log.info("Consecutive loss counter manually reset to 0")
+
+    def reset_daily_counters(self) -> None:
+        """Manually reset today's trade count and realised PnL to zero."""
+        self._daily_trades = 0
+        self._daily_realised_pnl = 0.0
+        log.info("Daily counters (trades + PnL) manually reset")
+
+    def reset_all_counters(self) -> None:
+        """Reset every limiter counter at once."""
+        self.reset_cooldown()
+        self.reset_consecutive_losses()
+        self.reset_daily_counters()
+        log.info("All risk counters reset")
+
+    # ── Midnight auto-reset ───────────────────────────────────────────────
+
+    async def run_midnight_reset_loop(self) -> None:
+        """Background task: reset daily counters exactly at midnight UTC.
+
+        Sleeps until the next 00:00:00 UTC, fires the reset, then loops.
+        Started as an asyncio.Task by the bot engine on startup.
+        """
+        while True:
+            now = datetime.utcnow()
+            tomorrow = datetime(now.year, now.month, now.day) + timedelta(days=1)
+            sleep_secs = (tomorrow - now).total_seconds()
+            log.info(
+                f"Midnight reset scheduled in "
+                f"{int(sleep_secs // 3600)}h {int((sleep_secs % 3600) // 60)}m"
+            )
+            await asyncio.sleep(sleep_secs)
+            async with self._lock:
+                self._daily_trades = 0
+                self._daily_realised_pnl = 0.0
+                self._current_day = date.today()
+                log.info(f"Midnight UTC: daily counters reset for {self._current_day}")
+
     # ── Entry validation ──────────────────────────────────────────────────
 
     async def validate_entry(
@@ -196,7 +307,7 @@ class RiskManager:
                     reason=f"Notional {notional:.2f} < min_notional {self._min_notional}",
                 )
 
-            if notional > free_usdt - self._s.min_free_balance_usdt:
+            if notional > free_usdt - self._p("min_free_balance_usdt"):
                 return RiskDecision(
                     allowed=False,
                     reason=f"Insufficient free balance ({free_usdt:.2f} USDT)",
@@ -267,9 +378,14 @@ class RiskManager:
         Used by the UI layer to show accurate operational status.
         """
         blocks: list[dict] = []
-        s = self._s
         now = datetime.utcnow()
         is_new_day = date.today() != self._current_day
+
+        max_daily_loss_pct = self._p("max_daily_loss_pct")
+        max_trades_per_day = self._p("max_trades_per_day")
+        max_consecutive_losses = self._p("max_consecutive_losses")
+        cooldown_minutes = self._p("cooldown_minutes_after_losses")
+        min_free_balance = self._p("min_free_balance_usdt")
 
         # Safe mode (survives restarts)
         if self._safe_mode:
@@ -283,41 +399,41 @@ class RiskManager:
 
         # Daily counters only apply for the current trading day
         if not is_new_day:
-            capital = s.initial_capital_usdt
-            max_daily_loss = capital * s.max_daily_loss_pct / 100
+            capital = self._s.initial_capital_usdt
+            max_daily_loss = capital * max_daily_loss_pct / 100
             if self._daily_realised_pnl <= -max_daily_loss:
                 blocks.append({
                     "type": "daily_loss",
                     "name": "Daily Loss Limit",
                     "reason": (
                         f"Today's realised loss ({abs(self._daily_realised_pnl):.4f} USDT) "
-                        f"reached the {s.max_daily_loss_pct}% daily limit "
+                        f"reached the {max_daily_loss_pct}% daily limit "
                         f"({max_daily_loss:.2f} USDT on {capital:.0f} USDT capital)."
                     ),
-                    "reset_tip": "Resets automatically at midnight UTC (start of the next trading day).",
+                    "reset_tip": "Resets automatically at midnight UTC.",
                     "severity": "critical",
                 })
 
-            if self._daily_trades >= s.max_trades_per_day:
+            if self._daily_trades >= max_trades_per_day:
                 blocks.append({
                     "type": "max_trades",
                     "name": "Daily Trade Limit",
                     "reason": (
                         f"{self._daily_trades} trades executed today "
-                        f"(configured limit: {s.max_trades_per_day})."
+                        f"(configured limit: {max_trades_per_day})."
                     ),
-                    "reset_tip": "Resets automatically at midnight UTC (start of the next trading day).",
+                    "reset_tip": "Resets automatically at midnight UTC.",
                     "severity": "warning",
                 })
 
         # Consecutive losses (persists across days)
-        if self._consecutive_losses >= s.max_consecutive_losses:
+        if self._consecutive_losses >= max_consecutive_losses:
             blocks.append({
                 "type": "consecutive_losses",
                 "name": "Consecutive Loss Limit",
                 "reason": (
                     f"{self._consecutive_losses} consecutive losing trades "
-                    f"reached the limit of {s.max_consecutive_losses}."
+                    f"reached the limit of {max_consecutive_losses}."
                 ),
                 "reset_tip": (
                     "Clears automatically after the next profitable trade closes. "
@@ -327,10 +443,8 @@ class RiskManager:
             })
 
         # Cooldown timer
-        if self._last_loss_time and s.cooldown_minutes_after_losses > 0:
-            cooldown_end = self._last_loss_time + timedelta(
-                minutes=s.cooldown_minutes_after_losses
-            )
+        if self._last_loss_time and cooldown_minutes > 0:
+            cooldown_end = self._last_loss_time + timedelta(minutes=cooldown_minutes)
             if now < cooldown_end:
                 remaining = int((cooldown_end - now).total_seconds())
                 mins, secs = divmod(remaining, 60)
@@ -339,8 +453,7 @@ class RiskManager:
                     "name": "Post-Loss Cooldown",
                     "reason": (
                         f"Mandatory cooldown period is active after a losing trade. "
-                        f"{mins}m {secs:02d}s remaining out of "
-                        f"{s.cooldown_minutes_after_losses} min total."
+                        f"{mins}m {secs:02d}s remaining out of {cooldown_minutes} min total."
                     ),
                     "reset_tip": f"Lifts automatically in {mins}m {secs:02d}s. No action needed.",
                     "severity": "warning",
@@ -348,13 +461,13 @@ class RiskManager:
                 })
 
         # Minimum free balance (optional — only checked when balance is known)
-        if free_usdt is not None and free_usdt < s.min_free_balance_usdt:
+        if free_usdt is not None and free_usdt < min_free_balance:
             blocks.append({
                 "type": "min_balance",
                 "name": "Minimum Balance Reserve",
                 "reason": (
                     f"Free USDT ({free_usdt:.2f}) is below the required minimum "
-                    f"({s.min_free_balance_usdt:.2f} USDT)."
+                    f"({min_free_balance:.2f} USDT)."
                 ),
                 "reset_tip": (
                     "Recovers automatically when the open position is closed "
@@ -377,11 +490,16 @@ class RiskManager:
 
     async def _check_rules(self, free_usdt: float) -> list[RiskViolation]:
         violations: list[RiskViolation] = []
-        s = self._s
+
+        max_daily_loss_pct = self._p("max_daily_loss_pct")
+        max_consecutive_losses = self._p("max_consecutive_losses")
+        cooldown_minutes = self._p("cooldown_minutes_after_losses")
+        max_trades_per_day = self._p("max_trades_per_day")
+        min_free_balance = self._p("min_free_balance_usdt")
 
         # Daily loss limit
-        capital = s.initial_capital_usdt
-        max_daily_loss = capital * s.max_daily_loss_pct / 100
+        capital = self._s.initial_capital_usdt
+        max_daily_loss = capital * max_daily_loss_pct / 100
         if self._daily_realised_pnl <= -max_daily_loss:
             violations.append(
                 RiskViolation(
@@ -396,24 +514,22 @@ class RiskManager:
             )
 
         # Consecutive losses
-        if self._consecutive_losses >= s.max_consecutive_losses:
+        if self._consecutive_losses >= max_consecutive_losses:
             violations.append(
                 RiskViolation(
                     event_type=RiskEventType.CONSECUTIVE_LOSSES,
                     description=(
                         f"Consecutive loss limit: {self._consecutive_losses} "
-                        f"≥ {s.max_consecutive_losses}"
+                        f"≥ {max_consecutive_losses}"
                     ),
                     value=float(self._consecutive_losses),
-                    threshold=float(s.max_consecutive_losses),
+                    threshold=float(max_consecutive_losses),
                 )
             )
 
         # Cooldown
-        if self._last_loss_time and s.cooldown_minutes_after_losses > 0:
-            cooldown_end = self._last_loss_time + timedelta(
-                minutes=s.cooldown_minutes_after_losses
-            )
+        if self._last_loss_time and cooldown_minutes > 0:
+            cooldown_end = self._last_loss_time + timedelta(minutes=cooldown_minutes)
             if datetime.utcnow() < cooldown_end:
                 remaining = (cooldown_end - datetime.utcnow()).seconds // 60
                 violations.append(
@@ -424,30 +540,30 @@ class RiskManager:
                 )
 
         # Max trades per day
-        if self._daily_trades >= s.max_trades_per_day:
+        if self._daily_trades >= max_trades_per_day:
             violations.append(
                 RiskViolation(
                     event_type=RiskEventType.MAX_TRADES,
                     description=(
                         f"Max trades/day reached: {self._daily_trades} "
-                        f"≥ {s.max_trades_per_day}"
+                        f"≥ {max_trades_per_day}"
                     ),
                     value=float(self._daily_trades),
-                    threshold=float(s.max_trades_per_day),
+                    threshold=float(max_trades_per_day),
                 )
             )
 
         # Minimum free balance
-        if free_usdt < s.min_free_balance_usdt:
+        if free_usdt < min_free_balance:
             violations.append(
                 RiskViolation(
                     event_type=RiskEventType.MIN_BALANCE,
                     description=(
                         f"Free balance {free_usdt:.2f} < "
-                        f"minimum {s.min_free_balance_usdt:.2f} USDT"
+                        f"minimum {min_free_balance:.2f} USDT"
                     ),
                     value=free_usdt,
-                    threshold=s.min_free_balance_usdt,
+                    threshold=min_free_balance,
                 )
             )
 
@@ -468,7 +584,7 @@ class RiskManager:
 
         Returns (quantity, risk_amount_usdt).
         """
-        tradeable = free_usdt - self._s.min_free_balance_usdt
+        tradeable = free_usdt - self._p("min_free_balance_usdt")
         if tradeable <= 0:
             return 0.0, 0.0
 

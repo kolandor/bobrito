@@ -311,6 +311,17 @@ def create_ui_router(settings: Settings) -> APIRouter:
             _base_ctx(request, bot_status=bot_status),
         )
 
+    @router.get("/partials/risk-controls", response_class=HTMLResponse)
+    async def partial_risk_controls(request: Request):
+        if err := _partial_auth_check(request):
+            return err
+        bot = get_bot_optional()
+        risk_params = UIService(bot, settings).get_risk_params() if bot else None  # type: ignore[arg-type]
+        return _templates.TemplateResponse(
+            "partials/risk_controls.html",
+            _base_ctx(request, risk_params=risk_params),
+        )
+
     # ── Action Routes ─────────────────────────────────────────────────────────
 
     @router.post("/actions/start")
@@ -419,5 +430,116 @@ def create_ui_router(settings: Settings) -> APIRouter:
             log.exception("UI action emergency_stop failed")
             _set_flash(request, "error", f"Emergency stop failed: {exc}")
         return RedirectResponse(url=f"{prefix}/dashboard", status_code=302)
+
+    # ── Risk Control Actions ───────────────────────────────────────────────────
+
+    @router.post("/actions/risk/reset-cooldown")
+    async def action_reset_cooldown(request: Request):
+        if redir := _require_auth(request):
+            return redir
+        if _block_readonly(request):
+            return RedirectResponse(url=f"{prefix}/system", status_code=302)
+        try:
+            get_bot()._risk.reset_cooldown()  # noqa: SLF001
+            _set_flash(request, "success", "Post-loss cooldown cleared.")
+            log.info("UI audit: action=risk/reset-cooldown")
+        except Exception as exc:
+            _set_flash(request, "error", f"Reset cooldown failed: {exc}")
+        return RedirectResponse(url=f"{prefix}/system", status_code=302)
+
+    @router.post("/actions/risk/reset-consecutive-losses")
+    async def action_reset_consecutive_losses(request: Request):
+        if redir := _require_auth(request):
+            return redir
+        if _block_readonly(request):
+            return RedirectResponse(url=f"{prefix}/system", status_code=302)
+        try:
+            get_bot()._risk.reset_consecutive_losses()  # noqa: SLF001
+            _set_flash(request, "success", "Consecutive loss counter reset to 0.")
+            log.info("UI audit: action=risk/reset-consecutive-losses")
+        except Exception as exc:
+            _set_flash(request, "error", f"Reset consecutive losses failed: {exc}")
+        return RedirectResponse(url=f"{prefix}/system", status_code=302)
+
+    @router.post("/actions/risk/reset-daily-counters")
+    async def action_reset_daily_counters(request: Request):
+        if redir := _require_auth(request):
+            return redir
+        if _block_readonly(request):
+            return RedirectResponse(url=f"{prefix}/system", status_code=302)
+        try:
+            get_bot()._risk.reset_daily_counters()  # noqa: SLF001
+            _set_flash(request, "success", "Daily trade count and PnL reset.")
+            log.info("UI audit: action=risk/reset-daily-counters")
+        except Exception as exc:
+            _set_flash(request, "error", f"Reset daily counters failed: {exc}")
+        return RedirectResponse(url=f"{prefix}/system", status_code=302)
+
+    @router.post("/actions/risk/reset-all")
+    async def action_reset_all_risk(request: Request):
+        if redir := _require_auth(request):
+            return redir
+        if _block_readonly(request):
+            return RedirectResponse(url=f"{prefix}/system", status_code=302)
+        try:
+            get_bot()._risk.reset_all_counters()  # noqa: SLF001
+            _set_flash(request, "success", "All risk counters reset.")
+            log.info("UI audit: action=risk/reset-all")
+        except Exception as exc:
+            _set_flash(request, "error", f"Reset all counters failed: {exc}")
+        return RedirectResponse(url=f"{prefix}/system", status_code=302)
+
+    @router.post("/actions/risk/update-params")
+    async def action_update_risk_params(
+        request: Request,
+        max_consecutive_losses: str = Form(default=""),
+        max_daily_loss_pct: str = Form(default=""),
+        cooldown_minutes_after_losses: str = Form(default=""),
+        max_trades_per_day: str = Form(default=""),
+        min_free_balance_usdt: str = Form(default=""),
+    ):
+        if redir := _require_auth(request):
+            return redir
+        if _block_readonly(request):
+            return RedirectResponse(url=f"{prefix}/system", status_code=302)
+        try:
+            risk = get_bot()._risk  # noqa: SLF001
+
+            def _int(v: str) -> int | None:
+                stripped = v.strip()
+                return int(stripped) if stripped else None
+
+            def _float(v: str) -> float | None:
+                stripped = v.strip()
+                return float(stripped) if stripped else None
+
+            risk.set_params(
+                max_consecutive_losses=_int(max_consecutive_losses),
+                max_daily_loss_pct=_float(max_daily_loss_pct),
+                cooldown_minutes_after_losses=_int(cooldown_minutes_after_losses),
+                max_trades_per_day=_int(max_trades_per_day),
+                min_free_balance_usdt=_float(min_free_balance_usdt),
+            )
+            _set_flash(request, "success", "Risk parameters updated successfully.")
+            log.info("UI audit: action=risk/update-params")
+        except (ValueError, TypeError) as exc:
+            _set_flash(request, "error", f"Invalid parameter value: {exc}")
+        except Exception as exc:
+            _set_flash(request, "error", f"Failed to update params: {exc}")
+        return RedirectResponse(url=f"{prefix}/system", status_code=302)
+
+    @router.post("/actions/risk/restore-defaults")
+    async def action_restore_risk_defaults(request: Request):
+        if redir := _require_auth(request):
+            return redir
+        if _block_readonly(request):
+            return RedirectResponse(url=f"{prefix}/system", status_code=302)
+        try:
+            get_bot()._risk.restore_defaults()  # noqa: SLF001
+            _set_flash(request, "success", "Risk parameters restored to .env defaults.")
+            log.info("UI audit: action=risk/restore-defaults")
+        except Exception as exc:
+            _set_flash(request, "error", f"Restore defaults failed: {exc}")
+        return RedirectResponse(url=f"{prefix}/system", status_code=302)
 
     return router

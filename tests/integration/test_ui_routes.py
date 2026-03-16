@@ -44,6 +44,13 @@ def _make_mock_bot(status: str = "running"):
         "safe_mode": False, "daily_trades": 0, "daily_pnl": 0.0,
         "consecutive_losses": 0, "current_day": "2026-03-15",
     }
+    risk.get_params.return_value = {
+        "max_consecutive_losses": {"value": 3, "default": 3, "overridden": False},
+        "max_daily_loss_pct": {"value": 3.0, "default": 3.0, "overridden": False},
+        "cooldown_minutes_after_losses": {"value": 60, "default": 60, "overridden": False},
+        "max_trades_per_day": {"value": 10, "default": 10, "overridden": False},
+        "min_free_balance_usdt": {"value": 50.0, "default": 50.0, "overridden": False},
+    }
     bot.get_risk.return_value = risk
     bot.get_last_snapshot.return_value = None
     bot._broker = None

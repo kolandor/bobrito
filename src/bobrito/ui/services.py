@@ -382,6 +382,7 @@ class UIService:
     def get_risk_status(self) -> RiskStatusVM:
         risk = self._bot.get_risk()
         s = risk.state_dict()
+        params = risk.get_params()
         blocks = _blocks_from_risk(risk)
         return RiskStatusVM(
             safe_mode=s["safe_mode"],
@@ -389,12 +390,16 @@ class UIService:
             daily_pnl=s["daily_pnl"],
             consecutive_losses=s["consecutive_losses"],
             current_day=s["current_day"],
-            max_daily_loss_pct=self._settings.max_daily_loss_pct,
-            max_consecutive_losses=self._settings.max_consecutive_losses,
-            max_trades_per_day=self._settings.max_trades_per_day,
+            max_daily_loss_pct=params["max_daily_loss_pct"]["value"],
+            max_consecutive_losses=params["max_consecutive_losses"]["value"],
+            max_trades_per_day=params["max_trades_per_day"]["value"],
             initial_capital_usdt=self._settings.initial_capital_usdt,
             active_blocks=blocks,
         )
+
+    def get_risk_params(self) -> dict:
+        """Return current effective risk params with override metadata for the controls UI."""
+        return self._bot.get_risk().get_params()
 
     def get_system_status(self) -> SystemStatusVM:
         d = self._bot.get_status_dict()

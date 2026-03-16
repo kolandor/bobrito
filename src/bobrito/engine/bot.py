@@ -16,6 +16,7 @@ Exit monitoring runs on every snapshot when a position is open.
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 from enum import Enum
@@ -77,6 +78,7 @@ class TradingBot:
 
         self._last_snapshot: MarketSnapshot | None = None
         self._snapshot_count: int = 0
+        self._midnight_reset_task: asyncio.Task | None = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -130,10 +132,18 @@ class TradingBot:
         self._start_time = time.time()
         self._status = BotStatus.RUNNING
         MetricsCollector.ws_connected.set(1)
+
+        self._midnight_reset_task = asyncio.create_task(
+            self._risk.run_midnight_reset_loop(),
+            name="midnight_reset",
+        )
+
         log.info("Bot running — waiting for market data…")
 
     async def stop(self) -> None:
         self._status = BotStatus.STOPPING
+        if self._midnight_reset_task and not self._midnight_reset_task.done():
+            self._midnight_reset_task.cancel()
         if self._feed:
             await self._feed.stop()
         if isinstance(self._broker, BinanceBroker):

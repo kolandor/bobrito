@@ -1,0 +1,214 @@
+{% if not readonly %}
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5 space-y-6" id="risk-controls-panel">
+
+  <!-- ── Header ───────────────────────────────────────────────────────────── -->
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h3 class="text-slate-300 text-sm font-semibold">Risk Controls</h3>
+      <p class="text-slate-500 text-xs mt-0.5">
+        Manual overrides apply immediately and persist until bot restart
+        or you click <em>Restore Defaults</em>.
+        Daily counters reset automatically at <strong class="text-slate-400">midnight UTC</strong>.
+      </p>
+    </div>
+    <form method="post" action="{{ prefix }}/actions/risk/restore-defaults"
+          onsubmit="return confirm('Restore ALL risk parameters to .env defaults?')">
+      <button type="submit"
+              class="shrink-0 text-xs px-3 py-1.5 rounded-lg border border-slate-600
+                     text-slate-400 hover:border-yellow-600/60 hover:text-yellow-300
+                     hover:bg-yellow-950/20 transition-colors font-medium whitespace-nowrap">
+        ↩ Restore .env Defaults
+      </button>
+    </form>
+  </div>
+
+  <!-- ── Counter resets ───────────────────────────────────────────────────── -->
+  <div>
+    <p class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-3">Reset Counters</p>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+
+      <form method="post" action="{{ prefix }}/actions/risk/reset-cooldown">
+        <button type="submit"
+                class="w-full text-xs px-3 py-2.5 rounded-lg bg-slate-700/50 border border-slate-600/60
+                       hover:bg-orange-950/40 hover:border-orange-700/50 hover:text-orange-300
+                       text-slate-300 transition-colors text-center leading-tight">
+          <span class="block text-lg mb-0.5">⏱</span>
+          Reset Cooldown
+        </button>
+      </form>
+
+      <form method="post" action="{{ prefix }}/actions/risk/reset-consecutive-losses">
+        <button type="submit"
+                class="w-full text-xs px-3 py-2.5 rounded-lg bg-slate-700/50 border border-slate-600/60
+                       hover:bg-orange-950/40 hover:border-orange-700/50 hover:text-orange-300
+                       text-slate-300 transition-colors text-center leading-tight">
+          <span class="block text-lg mb-0.5">🔁</span>
+          Reset Loss Streak
+        </button>
+      </form>
+
+      <form method="post" action="{{ prefix }}/actions/risk/reset-daily-counters">
+        <button type="submit"
+                class="w-full text-xs px-3 py-2.5 rounded-lg bg-slate-700/50 border border-slate-600/60
+                       hover:bg-blue-950/40 hover:border-blue-700/50 hover:text-blue-300
+                       text-slate-300 transition-colors text-center leading-tight">
+          <span class="block text-lg mb-0.5">📅</span>
+          Reset Daily
+        </button>
+      </form>
+
+      <form method="post" action="{{ prefix }}/actions/risk/reset-all"
+            onsubmit="return confirm('Reset ALL risk counters?\nThis clears cooldown, loss streak, daily trades and PnL.\nThe bot will be able to trade immediately.')">
+        <button type="submit"
+                class="w-full text-xs px-3 py-2.5 rounded-lg bg-red-950/30 border border-red-800/50
+                       hover:bg-red-950/50 hover:border-red-600/60 hover:text-red-300
+                       text-red-400 transition-colors text-center leading-tight font-semibold">
+          <span class="block text-lg mb-0.5">⚡</span>
+          Reset All
+        </button>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ── Parameter overrides ──────────────────────────────────────────────── -->
+  <div>
+    <p class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-3">Override Limits</p>
+
+    {% if risk_params %}
+    <form method="post" action="{{ prefix }}/actions/risk/update-params">
+      <div class="space-y-2.5">
+
+        <!-- Max consecutive losses -->
+        {% set p = risk_params.max_consecutive_losses %}
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <label class="text-xs text-slate-400 w-56 flex items-center gap-1.5 shrink-0">
+            Max consecutive losses
+            {% if p.overridden %}
+            <span class="text-[10px] font-bold px-1 py-0.5 rounded
+                         bg-yellow-900/50 text-yellow-400 border border-yellow-700/40 leading-none">
+              OVERRIDDEN
+            </span>
+            {% endif %}
+          </label>
+          <input type="number" name="max_consecutive_losses"
+                 min="1" max="100" step="1"
+                 value="{{ p.value }}"
+                 class="w-24 bg-slate-700/80 border rounded-lg px-2.5 py-1.5 text-xs
+                        text-slate-200 font-mono focus:outline-none focus:border-blue-500/60
+                        {% if p.overridden %}border-yellow-700/50{% else %}border-slate-600/60{% endif %}">
+          <span class="text-slate-600 text-xs">default: {{ p.default }}</span>
+        </div>
+
+        <!-- Max daily loss % -->
+        {% set p = risk_params.max_daily_loss_pct %}
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <label class="text-xs text-slate-400 w-56 flex items-center gap-1.5 shrink-0">
+            Max daily loss (%)
+            {% if p.overridden %}
+            <span class="text-[10px] font-bold px-1 py-0.5 rounded
+                         bg-yellow-900/50 text-yellow-400 border border-yellow-700/40 leading-none">
+              OVERRIDDEN
+            </span>
+            {% endif %}
+          </label>
+          <input type="number" name="max_daily_loss_pct"
+                 min="0.1" max="100" step="0.1"
+                 value="{{ p.value }}"
+                 class="w-24 bg-slate-700/80 border rounded-lg px-2.5 py-1.5 text-xs
+                        text-slate-200 font-mono focus:outline-none focus:border-blue-500/60
+                        {% if p.overridden %}border-yellow-700/50{% else %}border-slate-600/60{% endif %}">
+          <span class="text-slate-600 text-xs">default: {{ p.default }}%</span>
+        </div>
+
+        <!-- Cooldown minutes -->
+        {% set p = risk_params.cooldown_minutes_after_losses %}
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <label class="text-xs text-slate-400 w-56 flex items-center gap-1.5 shrink-0">
+            Cooldown after losses (min)
+            {% if p.overridden %}
+            <span class="text-[10px] font-bold px-1 py-0.5 rounded
+                         bg-yellow-900/50 text-yellow-400 border border-yellow-700/40 leading-none">
+              OVERRIDDEN
+            </span>
+            {% endif %}
+          </label>
+          <input type="number" name="cooldown_minutes_after_losses"
+                 min="0" max="1440" step="1"
+                 value="{{ p.value }}"
+                 class="w-24 bg-slate-700/80 border rounded-lg px-2.5 py-1.5 text-xs
+                        text-slate-200 font-mono focus:outline-none focus:border-blue-500/60
+                        {% if p.overridden %}border-yellow-700/50{% else %}border-slate-600/60{% endif %}">
+          <span class="text-slate-600 text-xs">default: {{ p.default }} min &nbsp;(0 = disabled)</span>
+        </div>
+
+        <!-- Max daily trades -->
+        {% set p = risk_params.max_trades_per_day %}
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <label class="text-xs text-slate-400 w-56 flex items-center gap-1.5 shrink-0">
+            Max daily trades
+            {% if p.overridden %}
+            <span class="text-[10px] font-bold px-1 py-0.5 rounded
+                         bg-yellow-900/50 text-yellow-400 border border-yellow-700/40 leading-none">
+              OVERRIDDEN
+            </span>
+            {% endif %}
+          </label>
+          <input type="number" name="max_trades_per_day"
+                 min="1" max="500" step="1"
+                 value="{{ p.value }}"
+                 class="w-24 bg-slate-700/80 border rounded-lg px-2.5 py-1.5 text-xs
+                        text-slate-200 font-mono focus:outline-none focus:border-blue-500/60
+                        {% if p.overridden %}border-yellow-700/50{% else %}border-slate-600/60{% endif %}">
+          <span class="text-slate-600 text-xs">default: {{ p.default }}</span>
+        </div>
+
+        <!-- Min free balance -->
+        {% set p = risk_params.min_free_balance_usdt %}
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <label class="text-xs text-slate-400 w-56 flex items-center gap-1.5 shrink-0">
+            Min free balance (USDT)
+            {% if p.overridden %}
+            <span class="text-[10px] font-bold px-1 py-0.5 rounded
+                         bg-yellow-900/50 text-yellow-400 border border-yellow-700/40 leading-none">
+              OVERRIDDEN
+            </span>
+            {% endif %}
+          </label>
+          <input type="number" name="min_free_balance_usdt"
+                 min="0" step="0.01"
+                 value="{{ p.value }}"
+                 class="w-24 bg-slate-700/80 border rounded-lg px-2.5 py-1.5 text-xs
+                        text-slate-200 font-mono focus:outline-none focus:border-blue-500/60
+                        {% if p.overridden %}border-yellow-700/50{% else %}border-slate-600/60{% endif %}">
+          <span class="text-slate-600 text-xs">default: {{ p.default }} USDT</span>
+        </div>
+
+      </div>
+
+      <div class="pt-3 flex items-center gap-4">
+        <button type="submit"
+                class="text-xs px-4 py-2 rounded-lg bg-blue-600/20 border border-blue-600/50
+                       text-blue-300 hover:bg-blue-600/30 hover:border-blue-500
+                       transition-colors font-medium">
+          Apply Changes
+        </button>
+        <span class="text-slate-600 text-xs">
+          Changes take effect immediately.
+          Restart the bot to make them permanent.
+        </span>
+      </div>
+
+    </form>
+    {% else %}
+    <p class="text-slate-500 text-sm">Bot is not running — start the bot to manage risk parameters.</p>
+    {% endif %}
+
+  </div>
+
+</div>
+{% else %}
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5">
+  <p class="text-slate-500 text-sm">Risk controls are disabled in read-only mode.</p>
+</div>
+{% endif %}
