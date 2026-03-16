@@ -1,0 +1,199 @@
+{% if not risk_vm %}
+<div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5 text-slate-500 text-sm">
+  Risk data not available — bot may not be running.
+</div>
+{% else %}
+
+<div class="bg-slate-800 border {% if risk_vm.has_overrides %}border-yellow-700/50{% else %}border-slate-700/60{% endif %} rounded-xl p-5">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <div class="flex items-center justify-between mb-5">
+    <div>
+      <h3 class="text-slate-300 text-sm font-semibold">Risk Limiter Controls</h3>
+      <p class="text-slate-500 text-xs mt-0.5">Adjust limits for the current session. All overrides revert at midnight UTC.</p>
+    </div>
+    {% if risk_vm.has_overrides %}
+    <span class="text-xs font-bold px-2 py-0.5 rounded bg-yellow-900/50 text-yellow-300 border border-yellow-700/50 flex-shrink-0">
+      OVERRIDES ACTIVE
+    </span>
+    {% else %}
+    <span class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-700/60 text-slate-400 border border-slate-600/50 flex-shrink-0">
+      ENV DEFAULTS
+    </span>
+    {% endif %}
+  </div>
+
+  <!-- ── Reset Cooldown ──────────────────────────────────────────────────── -->
+  <div class="mb-5 p-3 rounded-lg {% if risk_vm.cooldown_active %}bg-orange-950/30 border border-orange-800/40{% else %}bg-slate-900/40 border border-slate-700/40{% endif %}">
+    <div class="flex items-start justify-between gap-3">
+      <div class="min-w-0">
+        <p class="text-slate-300 text-xs font-semibold">Reset Cooldown &amp; Loss Streak</p>
+        <p class="text-slate-500 text-xs mt-0.5 leading-relaxed">
+          Clears the active post-loss cooldown timer <em>and</em> resets the consecutive loss counter to zero,
+          allowing the bot to resume taking new entries immediately.
+          Use this only after consciously reviewing market conditions.
+        </p>
+      </div>
+      {% if not readonly %}
+      <form method="post" action="{{ prefix }}/actions/risk/reset-cooldown"
+            class="flex-shrink-0"
+            {% if risk_vm.cooldown_active or risk_vm.consecutive_losses > 0 %}
+            onsubmit="return confirm('Reset cooldown and clear the loss streak of {{ risk_vm.consecutive_losses }} consecutive loss(es)? The bot will be able to take new entries immediately.')"
+            {% endif %}>
+        <button type="submit"
+          class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors
+            {% if risk_vm.cooldown_active or risk_vm.consecutive_losses > 0 %}
+            bg-orange-800/60 hover:bg-orange-700/70 text-orange-200 border border-orange-700/50
+            {% else %}
+            bg-slate-700/60 hover:bg-slate-600/60 text-slate-300 border border-slate-600/50
+            {% endif %}">
+          Reset Cooldown
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% if risk_vm.cooldown_active %}
+    {% for b in risk_vm.active_blocks if b.type == 'cooldown' %}
+    <p class="text-orange-400/80 text-xs mt-2">⏱ {{ b.reason }}</p>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  <!-- ── Change Limits Form ──────────────────────────────────────────────── -->
+  {% if not readonly %}
+  <form method="post" action="{{ prefix }}/actions/risk/update-limits">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+
+      <!-- Consecutive losses -->
+      <div>
+        <label class="block text-slate-400 text-xs font-medium mb-1">
+          Consecutive losses limit
+          {% if risk_vm.max_consecutive_losses != risk_vm.default_max_consecutive_losses %}
+          <span class="text-yellow-500 text-xs">(overridden)</span>
+          {% endif %}
+        </label>
+        <div class="flex items-center gap-2">
+          <input
+            type="number"
+            name="max_consecutive_losses"
+            min="1"
+            step="1"
+            placeholder="{{ risk_vm.max_consecutive_losses }}"
+            class="w-full bg-slate-900 border border-slate-600/60 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500/70 focus:ring-1 focus:ring-blue-500/30"
+          >
+        </div>
+        <p class="text-slate-600 text-xs mt-0.5">
+          Active: <span class="font-mono text-slate-400">{{ risk_vm.max_consecutive_losses }}</span>
+          &nbsp;·&nbsp; Default: <span class="font-mono text-slate-500">{{ risk_vm.default_max_consecutive_losses }}</span>
+        </p>
+      </div>
+
+      <!-- Daily PnL limit -->
+      <div>
+        <label class="block text-slate-400 text-xs font-medium mb-1">
+          Daily PnL limit (%)
+          {% if risk_vm.max_daily_loss_pct != risk_vm.default_max_daily_loss_pct %}
+          <span class="text-yellow-500 text-xs">(overridden)</span>
+          {% endif %}
+        </label>
+        <div class="flex items-center gap-2">
+          <input
+            type="number"
+            name="max_daily_loss_pct"
+            min="0.1"
+            max="20"
+            step="0.1"
+            placeholder="{{ risk_vm.max_daily_loss_pct }}"
+            class="w-full bg-slate-900 border border-slate-600/60 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500/70 focus:ring-1 focus:ring-blue-500/30"
+          >
+        </div>
+        {% set loss_usdt = risk_vm.initial_capital_usdt * risk_vm.max_daily_loss_pct / 100 %}
+        <p class="text-slate-600 text-xs mt-0.5">
+          Active: <span class="font-mono text-slate-400">{{ risk_vm.max_daily_loss_pct }}% (~{{ "%.2f"|format(loss_usdt) }} USDT)</span>
+          &nbsp;·&nbsp; Default: <span class="font-mono text-slate-500">{{ risk_vm.default_max_daily_loss_pct }}%</span>
+        </p>
+      </div>
+
+      <!-- Min free balance -->
+      <div>
+        <label class="block text-slate-400 text-xs font-medium mb-1">
+          Min free balance (USDT)
+          {% if risk_vm.min_free_balance_usdt != risk_vm.default_min_free_balance_usdt %}
+          <span class="text-yellow-500 text-xs">(overridden)</span>
+          {% endif %}
+        </label>
+        <div class="flex items-center gap-2">
+          <input
+            type="number"
+            name="min_free_balance_usdt"
+            min="0"
+            step="0.5"
+            placeholder="{{ risk_vm.min_free_balance_usdt }}"
+            class="w-full bg-slate-900 border border-slate-600/60 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500/70 focus:ring-1 focus:ring-blue-500/30"
+          >
+        </div>
+        <p class="text-slate-600 text-xs mt-0.5">
+          Active: <span class="font-mono text-slate-400">{{ risk_vm.min_free_balance_usdt }} USDT</span>
+          &nbsp;·&nbsp; Default: <span class="font-mono text-slate-500">{{ risk_vm.default_min_free_balance_usdt }} USDT</span>
+        </p>
+      </div>
+
+      <!-- Daily trades -->
+      <div>
+        <label class="block text-slate-400 text-xs font-medium mb-1">
+          Daily trades limit
+          {% if risk_vm.max_trades_per_day != risk_vm.default_max_trades_per_day %}
+          <span class="text-yellow-500 text-xs">(overridden)</span>
+          {% endif %}
+        </label>
+        <div class="flex items-center gap-2">
+          <input
+            type="number"
+            name="max_trades_per_day"
+            min="1"
+            step="1"
+            placeholder="{{ risk_vm.max_trades_per_day }}"
+            class="w-full bg-slate-900 border border-slate-600/60 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500/70 focus:ring-1 focus:ring-blue-500/30"
+          >
+        </div>
+        <p class="text-slate-600 text-xs mt-0.5">
+          Active: <span class="font-mono text-slate-400">{{ risk_vm.max_trades_per_day }}</span>
+          &nbsp;·&nbsp; Default: <span class="font-mono text-slate-500">{{ risk_vm.default_max_trades_per_day }}</span>
+        </p>
+      </div>
+
+    </div>
+
+    <!-- ── Actions row ──────────────────────────────────────────────────── -->
+    <div class="flex items-center justify-between pt-3 border-t border-slate-700/60">
+      <p class="text-slate-600 text-xs">Leave a field empty to keep its current value.</p>
+      <div class="flex items-center gap-2">
+        {% if risk_vm.has_overrides %}
+        <form method="post" action="{{ prefix }}/actions/risk/restore-defaults"
+              onsubmit="return confirm('Restore all risk limits to their ENV-file defaults?')">
+          <button type="submit"
+            class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700/60 hover:bg-slate-600/60 text-slate-300 border border-slate-600/50 transition-colors">
+            Restore Defaults
+          </button>
+        </form>
+        {% endif %}
+        <button type="submit"
+          class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-blue-700/70 hover:bg-blue-600/80 text-white border border-blue-600/50 transition-colors">
+          Update Limits
+        </button>
+      </div>
+    </div>
+  </form>
+
+  {% else %}
+  <!-- read-only notice -->
+  <div class="text-slate-500 text-xs border-t border-slate-700/60 pt-3 mt-1">
+    Read-only mode — limit changes are disabled.
+    {% if risk_vm.has_overrides %}
+    <span class="text-yellow-500/80">Overrides are currently active but cannot be modified or restored from this session.</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}

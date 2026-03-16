@@ -82,10 +82,20 @@ class RiskStatusVM:
     daily_pnl: float
     consecutive_losses: int
     current_day: str
+    # Effective (possibly overridden) limits
     max_daily_loss_pct: float = 3.0
     max_consecutive_losses: int = 3
     max_trades_per_day: int = 10
+    min_free_balance_usdt: float = 20.0
     initial_capital_usdt: float = 200.0
+    # ENV-file default limits (for display / restore reference)
+    default_max_daily_loss_pct: float = 3.0
+    default_max_consecutive_losses: int = 3
+    default_max_trades_per_day: int = 10
+    default_min_free_balance_usdt: float = 20.0
+    # Override metadata
+    has_overrides: bool = False
+    cooldown_active: bool = False
     active_blocks: list[RiskBlockVM] = field(default_factory=list)
 
 

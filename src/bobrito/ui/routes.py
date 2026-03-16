@@ -311,6 +311,17 @@ def create_ui_router(settings: Settings) -> APIRouter:
             _base_ctx(request, bot_status=bot_status),
         )
 
+    @router.get("/partials/risk-limiter", response_class=HTMLResponse)
+    async def partial_risk_limiter(request: Request):
+        if err := _partial_auth_check(request):
+            return err
+        bot = get_bot_optional()
+        risk_vm = UIService(bot, settings).get_risk_status() if bot else None
+        return _templates.TemplateResponse(
+            "partials/risk_limiter_controls.html",
+            _base_ctx(request, risk_vm=risk_vm),
+        )
+
     # ── Action Routes ─────────────────────────────────────────────────────────
 
     @router.post("/actions/start")
@@ -419,5 +430,108 @@ def create_ui_router(settings: Settings) -> APIRouter:
             log.exception("UI action emergency_stop failed")
             _set_flash(request, "error", f"Emergency stop failed: {exc}")
         return RedirectResponse(url=f"{prefix}/dashboard", status_code=302)
+
+    # ── Risk Limiter Actions ───────────────────────────────────────────────────
+
+    @router.post("/actions/risk/reset-cooldown")
+    async def action_risk_reset_cooldown(request: Request):
+        if redir := _require_auth(request):
+            return redir
+        if _block_readonly(request):
+            return RedirectResponse(url=f"{prefix}/system", status_code=302)
+        try:
+            bot = get_bot()
+            await bot.get_risk().reset_cooldown()
+            _set_flash(
+                request,
+                "success",
+                "Post-loss cooldown and consecutive loss streak reset. New entries are now unblocked.",
+            )
+            log.warning("UI audit: action=risk_reset_cooldown")
+        except Exception as exc:
+            log.exception("UI action risk_reset_cooldown failed")
+            _set_flash(request, "error", f"Reset cooldown failed: {exc}")
+        return RedirectResponse(url=f"{prefix}/system", status_code=302)
+
+    @router.post("/actions/risk/update-limits")
+    async def action_risk_update_limits(
+        request: Request,
+        max_consecutive_losses: str = Form(""),
+        max_daily_loss_pct: str = Form(""),
+        min_free_balance_usdt: str = Form(""),
+        max_trades_per_day: str = Form(""),
+    ):
+        if redir := _require_auth(request):
+            return redir
+        if _block_readonly(request):
+            return RedirectResponse(url=f"{prefix}/system", status_code=302)
+        try:
+            bot = get_bot()
+            risk = bot.get_risk()
+            changed: list[str] = []
+
+            if max_consecutive_losses.strip():
+                val = int(max_consecutive_losses.strip())
+                if val < 1:
+                    raise ValueError("Consecutive losses limit must be ≥ 1.")
+                risk.set_max_consecutive_losses(val)
+                changed.append(f"consecutive losses → {val}")
+
+            if max_daily_loss_pct.strip():
+                val_f = float(max_daily_loss_pct.strip())
+                if val_f <= 0 or val_f > 20:
+                    raise ValueError("Daily PnL limit must be between 0.1% and 20%.")
+                risk.set_max_daily_loss_pct(val_f)
+                changed.append(f"daily PnL limit → {val_f}%")
+
+            if min_free_balance_usdt.strip():
+                val_f = float(min_free_balance_usdt.strip())
+                if val_f < 0:
+                    raise ValueError("Minimum free balance must be ≥ 0.")
+                risk.set_min_free_balance_usdt(val_f)
+                changed.append(f"min free balance → {val_f} USDT")
+
+            if max_trades_per_day.strip():
+                val = int(max_trades_per_day.strip())
+                if val < 1:
+                    raise ValueError("Daily trades limit must be ≥ 1.")
+                risk.set_max_trades_per_day(val)
+                changed.append(f"daily trades → {val}")
+
+            if changed:
+                _set_flash(
+                    request,
+                    "success",
+                    "Risk limits updated: " + ", ".join(changed) + ". Revert automatically at midnight.",
+                )
+                log.warning(f"UI audit: action=risk_update_limits changes={changed}")
+            else:
+                _set_flash(request, "info", "No limit values were changed (all fields were empty).")
+        except ValueError as exc:
+            _set_flash(request, "error", f"Invalid value: {exc}")
+        except Exception as exc:
+            log.exception("UI action risk_update_limits failed")
+            _set_flash(request, "error", f"Failed to update limits: {exc}")
+        return RedirectResponse(url=f"{prefix}/system", status_code=302)
+
+    @router.post("/actions/risk/restore-defaults")
+    async def action_risk_restore_defaults(request: Request):
+        if redir := _require_auth(request):
+            return redir
+        if _block_readonly(request):
+            return RedirectResponse(url=f"{prefix}/system", status_code=302)
+        try:
+            bot = get_bot()
+            bot.get_risk().restore_defaults()
+            _set_flash(
+                request,
+                "success",
+                "Risk limits restored to ENV-file defaults.",
+            )
+            log.info("UI audit: action=risk_restore_defaults")
+        except Exception as exc:
+            log.exception("UI action risk_restore_defaults failed")
+            _set_flash(request, "error", f"Failed to restore defaults: {exc}")
+        return RedirectResponse(url=f"{prefix}/system", status_code=302)
 
     return router

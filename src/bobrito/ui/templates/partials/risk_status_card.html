@@ -9,7 +9,14 @@
   {% if risk_vm and risk_vm.active_blocks %}border-orange-700/60{% else %}border-slate-700/60{% endif %}">
 
   <div class="flex items-center justify-between mb-4">
-    <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Risk Guard</h3>
+    <div class="flex items-center gap-2">
+      <h3 class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Risk Guard</h3>
+      {% if risk_vm and risk_vm.has_overrides %}
+      <span class="text-xs font-semibold px-1.5 py-0.5 rounded bg-yellow-900/40 text-yellow-400 border border-yellow-700/40" title="One or more limits differ from ENV defaults">
+        OVERRIDES
+      </span>
+      {% endif %}
+    </div>
     {% if risk_vm and risk_vm.active_blocks %}
     <span class="text-xs font-bold px-2 py-0.5 rounded bg-orange-900/50 text-orange-300 border border-orange-700/50">
       {{ risk_vm.active_blocks | length }} BLOCK{{ 'S' if risk_vm.active_blocks | length > 1 else '' }}
@@ -40,6 +47,9 @@
           {% if has_consec_block %}
           <span class="text-xs font-bold px-1 py-0.5 rounded bg-red-900/60 text-red-300 border border-red-700/50">BLOCKED</span>
           {% endif %}
+          {% if risk_vm.max_consecutive_losses != risk_vm.default_max_consecutive_losses %}
+          <span class="text-xs px-1 py-0.5 rounded bg-yellow-900/40 text-yellow-500 border border-yellow-800/40" title="Overridden from default {{ risk_vm.default_max_consecutive_losses }}">✎</span>
+          {% endif %}
         </div>
         <span class="font-mono text-xs
           {% if has_consec_block %}text-red-400
@@ -69,6 +79,9 @@
           <span class="text-slate-500 text-xs">Daily trades</span>
           {% if has_trades_block %}
           <span class="text-xs font-bold px-1 py-0.5 rounded bg-orange-900/60 text-orange-300 border border-orange-700/50">BLOCKED</span>
+          {% endif %}
+          {% if risk_vm.max_trades_per_day != risk_vm.default_max_trades_per_day %}
+          <span class="text-xs px-1 py-0.5 rounded bg-yellow-900/40 text-yellow-500 border border-yellow-800/40" title="Overridden from default {{ risk_vm.default_max_trades_per_day }}">✎</span>
           {% endif %}
         </div>
         <span class="font-mono text-xs
@@ -130,9 +143,23 @@
         <span class="text-slate-400 text-xs">{{ risk_vm.current_day }}</span>
       </div>
       <div class="flex justify-between items-center">
-        <span class="text-slate-500 text-xs">Max daily loss</span>
+        <div class="flex items-center gap-1.5">
+          <span class="text-slate-500 text-xs">Max daily loss</span>
+          {% if risk_vm.max_daily_loss_pct != risk_vm.default_max_daily_loss_pct %}
+          <span class="text-xs px-1 py-0.5 rounded bg-yellow-900/40 text-yellow-500 border border-yellow-800/40" title="Overridden from default {{ risk_vm.default_max_daily_loss_pct }}%">✎</span>
+          {% endif %}
+        </div>
         {% set max_loss_usdt = risk_vm.initial_capital_usdt * risk_vm.max_daily_loss_pct / 100 %}
         <span class="text-slate-400 text-xs">{{ risk_vm.max_daily_loss_pct }}% (~{{ "%.2f"|format(max_loss_usdt) }} USDT)</span>
+      </div>
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-1.5">
+          <span class="text-slate-500 text-xs">Min free balance</span>
+          {% if risk_vm.min_free_balance_usdt != risk_vm.default_min_free_balance_usdt %}
+          <span class="text-xs px-1 py-0.5 rounded bg-yellow-900/40 text-yellow-500 border border-yellow-800/40" title="Overridden from default {{ risk_vm.default_min_free_balance_usdt }} USDT">✎</span>
+          {% endif %}
+        </div>
+        <span class="text-slate-400 text-xs">{{ risk_vm.min_free_balance_usdt }} USDT</span>
       </div>
     </div>
 

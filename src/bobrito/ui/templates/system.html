@@ -3,10 +3,11 @@
 
 {% block content %}
 <div class="mb-5">
-  <h2 class="text-lg font-semibold text-white">Risk & System Status</h2>
-  <p class="text-slate-500 text-sm">Risk guard state, market data feed and recent events</p>
+  <h2 class="text-lg font-semibold text-white">Risk &amp; System Status</h2>
+  <p class="text-slate-500 text-sm">Risk guard state, limit controls, market data feed and recent events</p>
 </div>
 
+<!-- ── Row 1: Risk guard status + System / feed status ──────────────────── -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
   <div hx-get="{{ prefix }}/partials/risk"
        hx-trigger="load, every {{ refresh_seconds }}s"
@@ -21,6 +22,15 @@
   </div>
 </div>
 
+<!-- ── Row 2: Risk limiter controls (loaded once; refreshes on form submit) -->
+<div class="mb-4"
+     hx-get="{{ prefix }}/partials/risk-limiter"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+  {% include "partials/_loading_card.html" %}
+</div>
+
+<!-- ── Row 3: Recent system events ──────────────────────────────────────── -->
 <div hx-get="{{ prefix }}/partials/events-table"
      hx-trigger="load, every {{ refresh_seconds }}s"
      hx-swap="innerHTML">

@@ -383,16 +383,26 @@ class UIService:
         risk = self._bot.get_risk()
         s = risk.state_dict()
         blocks = _blocks_from_risk(risk)
+        cooldown_active = any(b.type == "cooldown" for b in blocks)
+        lim = s["limits"]
+        dfl = s["defaults"]
         return RiskStatusVM(
             safe_mode=s["safe_mode"],
             daily_trades=s["daily_trades"],
             daily_pnl=s["daily_pnl"],
             consecutive_losses=s["consecutive_losses"],
             current_day=s["current_day"],
-            max_daily_loss_pct=self._settings.max_daily_loss_pct,
-            max_consecutive_losses=self._settings.max_consecutive_losses,
-            max_trades_per_day=self._settings.max_trades_per_day,
+            max_daily_loss_pct=lim["max_daily_loss_pct"],
+            max_consecutive_losses=lim["max_consecutive_losses"],
+            max_trades_per_day=lim["max_trades_per_day"],
+            min_free_balance_usdt=lim["min_free_balance_usdt"],
             initial_capital_usdt=self._settings.initial_capital_usdt,
+            default_max_daily_loss_pct=dfl["max_daily_loss_pct"],
+            default_max_consecutive_losses=dfl["max_consecutive_losses"],
+            default_max_trades_per_day=dfl["max_trades_per_day"],
+            default_min_free_balance_usdt=dfl["min_free_balance_usdt"],
+            has_overrides=s["has_overrides"],
+            cooldown_active=cooldown_active,
             active_blocks=blocks,
         )
 

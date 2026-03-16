@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from bobrito.api.deps import set_bot
-from bobrito.api.routes import bot, health, trading
+from bobrito.api.routes import bot, health, risk, trading
 from bobrito.config.settings import get_settings
 from bobrito.engine.bot import TradingBot
 from bobrito.monitoring.logger import get_logger, setup_logging
@@ -114,6 +114,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(bot.router)
     app.include_router(trading.router)
+    app.include_router(risk.router)
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request, exc):
