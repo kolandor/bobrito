@@ -74,6 +74,8 @@ class RiskEventType(str, enum.Enum):
     MAX_TRADES = "MAX_TRADES"
     MIN_BALANCE = "MIN_BALANCE"
     SAFE_MODE = "SAFE_MODE"
+    MIN_TARGET_DISTANCE = "MIN_TARGET_DISTANCE"
+    MIN_EXPECTED_EDGE = "MIN_EXPECTED_EDGE"
 
 
 class BotMode(str, enum.Enum):

@@ -30,6 +30,7 @@ from bobrito.config.settings import Settings
 from bobrito.monitoring.logger import get_logger
 from bobrito.monitoring.metrics import MetricsCollector
 from bobrito.persistence.database import DatabaseManager
+from bobrito.execution.base import SymbolFilters
 from bobrito.persistence.models import (
     Position,
     PositionStatus,
@@ -39,6 +40,11 @@ from bobrito.persistence.models import (
 from bobrito.strategy.base import Signal
 
 log = get_logger("risk.manager")
+
+
+def get_trading_day_utc() -> date:
+    """Return the current trading day in UTC. Use for all daily counter resets."""
+    return datetime.utcnow().date()
 
 
 @dataclass
@@ -73,7 +79,7 @@ class RiskManager:
         self._daily_realised_pnl: float = 0.0
         self._consecutive_losses: int = 0
         self._last_loss_time: datetime | None = None
-        self._current_day: date = date.today()
+        self._current_day: date = get_trading_day_utc()
         self._safe_mode: bool = False
         self._lock = asyncio.Lock()
 
@@ -123,8 +129,9 @@ class RiskManager:
         Restores daily_trades, daily_pnl, and the consecutive-loss streak so
         that risk limits remain correct after a process restart.
         """
-        today = date.today()
-        today_start = datetime.combine(today, datetime.min.time())
+        today = get_trading_day_utc()
+        # Midnight UTC of the trading day (for DB comparison with UTC-stored closed_at)
+        today_start = datetime(today.year, today.month, today.day, 0, 0, 0)
 
         async with self._db.session() as sess:
             # Today's closed trade count and realised PnL
@@ -171,19 +178,87 @@ class RiskManager:
 
     # ── Configuration ─────────────────────────────────────────────────────
 
-    def configure_filters(
-        self,
-        step_size: float,
-        min_qty: float,
-        min_notional: float,
-    ) -> None:
-        self._step_size = step_size
-        self._min_qty = min_qty
-        self._min_notional = min_notional
+    def configure_filters(self, filters: SymbolFilters) -> None:
+        self._step_size = float(filters.step_size)
+        self._min_qty = float(filters.min_qty)
+        self._min_notional = float(filters.min_notional)
         log.info(
-            f"Exchange filters set: step_size={step_size}, "
-            f"min_qty={min_qty}, min_notional={min_notional}"
+            f"Exchange filters set: step_size={self._step_size}, "
+            f"min_qty={self._min_qty}, min_notional={self._min_notional}"
         )
+
+    # ── Fee-aware entry filter (called before validate_entry) ───────────────
+
+    async def check_fee_filter(
+        self,
+        entry_price: float,
+        target_price: float,
+    ) -> RiskDecision:
+        """Reject if target distance or expected net edge is below configured minimums.
+
+        Persists RiskEvent (MIN_TARGET_DISTANCE or MIN_EXPECTED_EDGE) on rejection.
+        """
+        if not self._s.min_expected_edge_enabled:
+            return RiskDecision(allowed=True, reason="Fee filter disabled")
+
+        if entry_price <= 0 or target_price <= entry_price:
+            return RiskDecision(
+                allowed=False,
+                reason=f"Invalid prices: entry={entry_price} target={target_price}",
+            )
+
+        distance_to_target_bps = (target_price - entry_price) / entry_price * 10_000
+        estimated_roundtrip_cost_bps = (
+            self._s.estimated_roundtrip_fee_bps
+            + self._s.estimated_roundtrip_slippage_bps
+        )
+        expected_net_edge_bps = distance_to_target_bps - estimated_roundtrip_cost_bps
+
+        if distance_to_target_bps < self._s.min_target_distance_bps:
+            v = RiskViolation(
+                event_type=RiskEventType.MIN_TARGET_DISTANCE,
+                description=(
+                    f"Target distance {distance_to_target_bps:.1f} bps "
+                    f"< min {self._s.min_target_distance_bps} bps"
+                ),
+                value=distance_to_target_bps,
+                threshold=self._s.min_target_distance_bps,
+            )
+            log.info(
+                f"Fee filter rejected: {v.event_type.value} — "
+                f"distance={distance_to_target_bps:.1f} bps (min={self._s.min_target_distance_bps} bps)"
+            )
+            async with self._lock:
+                await self._persist_risk_event(v)
+            MetricsCollector.risk_events_total.labels(
+                event_type=RiskEventType.MIN_TARGET_DISTANCE.value
+            ).inc()
+            return RiskDecision(allowed=False, reason=v.description)
+
+        if expected_net_edge_bps < self._s.min_expected_net_edge_bps:
+            v = RiskViolation(
+                event_type=RiskEventType.MIN_EXPECTED_EDGE,
+                description=(
+                    f"Expected net edge {expected_net_edge_bps:.1f} bps "
+                    f"< min {self._s.min_expected_net_edge_bps} bps "
+                    f"(distance={distance_to_target_bps:.1f} bps, cost={estimated_roundtrip_cost_bps:.1f} bps)"
+                ),
+                value=expected_net_edge_bps,
+                threshold=self._s.min_expected_net_edge_bps,
+            )
+            log.info(
+                f"Fee filter rejected: {v.event_type.value} — "
+                f"net_edge={expected_net_edge_bps:.1f} bps (min={self._s.min_expected_net_edge_bps} bps), "
+                f"distance={distance_to_target_bps:.1f} bps, cost={estimated_roundtrip_cost_bps:.1f} bps"
+            )
+            async with self._lock:
+                await self._persist_risk_event(v)
+            MetricsCollector.risk_events_total.labels(
+                event_type=RiskEventType.MIN_EXPECTED_EDGE.value
+            ).inc()
+            return RiskDecision(allowed=False, reason=v.description)
+
+        return RiskDecision(allowed=True, reason="OK")
 
     # ── Entry validation ──────────────────────────────────────────────────
 
@@ -325,7 +400,7 @@ class RiskManager:
             async with self._lock:
                 self._daily_trades = 0
                 self._daily_realised_pnl = 0.0
-                self._current_day = date.today()
+                self._current_day = get_trading_day_utc()
                 self.restore_defaults()
                 log.info(f"Midnight UTC: daily counters + overrides reset for {self._current_day}")
 
@@ -407,7 +482,7 @@ class RiskManager:
         """
         blocks: list[dict] = []
         now = datetime.utcnow()
-        is_new_day = date.today() != self._current_day
+        is_new_day = get_trading_day_utc() != self._current_day
 
         # Safe mode (survives restarts)
         if self._safe_mode:
@@ -506,7 +581,7 @@ class RiskManager:
     # ── Private helpers ───────────────────────────────────────────────────
 
     def _maybe_reset_daily(self) -> None:
-        today = date.today()
+        today = get_trading_day_utc()
         if today != self._current_day:
             log.info(
                 f"New trading day {today}. Resetting daily counters and reverting limit overrides."

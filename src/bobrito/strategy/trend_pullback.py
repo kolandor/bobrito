@@ -27,10 +27,6 @@ from bobrito.strategy.indicators import (
 
 log = get_logger("strategy.trend_pullback")
 
-# Minimum closed candles required before strategy emits any signal
-MIN_1M_CANDLES = 30
-MIN_5M_CANDLES = 25
-
 
 class TrendPullbackStrategy:
     def __init__(
@@ -41,12 +37,41 @@ class TrendPullbackStrategy:
         volume_multiplier: float = 1.5,
         atr_stop_mult: float = 1.5,
         atr_target_mult: float = 3.0,
+        ema_min_separation_pct: float = 0.05,
+        pullback_lookback_bars: int = 5,
+        pullback_near_slow_ema_pct: float = 0.2,
+        volume_sma_period: int = 20,
+        swing_low_lookback: int = 5,
+        min_1m_warmup: int = 30,
+        min_5m_warmup: int = 25,
+        momentum_failure_confirm_bars: int = 2,
+        momentum_failure_min_hold_bars: int = 2,
+        momentum_failure_exit_ema: str = "fast",
     ) -> None:
-        self._ind = Indicators(ema_fast, ema_slow, atr_period)
+        self._ind = Indicators(
+            ema_fast, ema_slow, atr_period,
+            volume_sma_period=volume_sma_period,
+            swing_low_lookback=swing_low_lookback,
+        )
         self._vol_mult = volume_multiplier
         self._atr_stop = atr_stop_mult
         self._atr_target = atr_target_mult
+        self._ema_min_separation_pct = ema_min_separation_pct
+        self._pullback_lookback = pullback_lookback_bars
+        self._pullback_near_pct = pullback_near_slow_ema_pct
+        self._min_1m_warmup = min_1m_warmup
+        self._min_5m_warmup = min_5m_warmup
+        self._mf_confirm_bars = momentum_failure_confirm_bars
+        self._mf_min_hold_bars = momentum_failure_min_hold_bars
+        self._mf_exit_ema = momentum_failure_exit_ema  # "fast" or "slow"
         self._last_signal: Signal | None = None
+        self._position_bars_held: int = 0
+        self._consecutive_below_ema: int = 0
+
+    def reset_position_tracking(self) -> None:
+        """Call when a new position is opened. Resets bars-held and consecutive-below counters."""
+        self._position_bars_held = 0
+        self._consecutive_below_ema = 0
 
     # ── Public ────────────────────────────────────────────────────────────
 
@@ -60,8 +85,8 @@ class TrendPullbackStrategy:
 
         # ── Data sufficiency check ─────────────────────────────────────────
         if (
-            len(snapshot.candles_1m) < MIN_1M_CANDLES
-            or len(snapshot.candles_5m) < MIN_5M_CANDLES
+            len(snapshot.candles_1m) < self._min_1m_warmup
+            or len(snapshot.candles_5m) < self._min_5m_warmup
         ):
             return Signal(
                 signal_type=SignalType.HOLD,
@@ -102,7 +127,12 @@ class TrendPullbackStrategy:
             )
 
         uptrend_5m = is_uptrend(ind_5m["ema_fast"], ind_5m["ema_slow"])
-        pullback_1m = is_pullback(ind_1m["closes"], ind_1m["ema_slow"])
+        pullback_1m = is_pullback(
+            ind_1m["closes"],
+            ind_1m["ema_slow"],
+            lookback=self._pullback_lookback,
+            near_pct=self._pullback_near_pct,
+        )
         resuming_1m = is_resuming(ind_1m["closes"], ind_1m["ema_fast"])
 
         # Volume confirmation
@@ -160,25 +190,50 @@ class TrendPullbackStrategy:
         )
 
     def _evaluate_exit(self, snapshot: MarketSnapshot) -> Signal:
-        """Momentum-failure exit check when a position is open."""
+        """Momentum-failure exit: close below selected EMA for confirm_bars, after min_hold_bars."""
+        self._position_bars_held += 1
         ind_1m = self._ind.compute(snapshot.candles_1m)
         ema_fast_val = self._ind.last_valid(ind_1m["ema_fast"])
+        ema_slow_val = self._ind.last_valid(ind_1m["ema_slow"])
         closes = ind_1m.get("closes", [])
 
-        if ema_fast_val and closes and closes[-1] < ema_fast_val:
+        ema_val = ema_fast_val if self._mf_exit_ema == "fast" else ema_slow_val
+        if ema_val is None or not closes:
+            return Signal(
+                signal_type=SignalType.HOLD,
+                symbol=snapshot.symbol,
+                price=snapshot.last_price,
+                timestamp=snapshot.timestamp,
+                explanation="Position held — indicators not ready",
+            )
+
+        last_close = closes[-1]
+        if last_close < ema_val:
+            self._consecutive_below_ema += 1
+        else:
+            self._consecutive_below_ema = 0
+
+        exit_triggered = (
+            self._position_bars_held >= self._mf_min_hold_bars
+            and self._consecutive_below_ema >= self._mf_confirm_bars
+        )
+        if exit_triggered:
             return Signal(
                 signal_type=SignalType.EXIT,
                 symbol=snapshot.symbol,
                 price=snapshot.last_price,
                 timestamp=snapshot.timestamp,
-                explanation="MOMENTUM FAILURE: close < fast EMA",
+                explanation=(
+                    f"MOMENTUM FAILURE: close < {self._mf_exit_ema} EMA for "
+                    f"{self._consecutive_below_ema} bars (held {self._position_bars_held})"
+                ),
             )
         return Signal(
             signal_type=SignalType.HOLD,
             symbol=snapshot.symbol,
             price=snapshot.last_price,
             timestamp=snapshot.timestamp,
-            explanation="Position held — momentum intact",
+            explanation=f"Position held — bars={self._position_bars_held} below_ema={self._consecutive_below_ema}",
         )
 
     # ── Helpers ───────────────────────────────────────────────────────────
@@ -191,6 +246,6 @@ class TrendPullbackStrategy:
             return MarketRegime.UNKNOWN
 
         separation_pct = abs(ema_fast_val - ema_slow_val) / ema_slow_val * 100
-        if ema_fast_val > ema_slow_val and separation_pct >= 0.05:
+        if ema_fast_val > ema_slow_val and separation_pct >= self._ema_min_separation_pct:
             return MarketRegime.TRENDING
         return MarketRegime.SIDEWAYS

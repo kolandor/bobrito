@@ -1,6 +1,6 @@
 # Bobrito — Automated Trading Bot for Binance Spot BTC/USDT
 
-**Version 1.1** · Python 3.11+ · FastAPI · SQLite · Docker · Web UI
+**Version 1.3** · Python 3.11+ · FastAPI · SQLite · Docker · Web UI
 
 > A production-grade automated trading platform with strict risk management,
 > paper/testnet/live mode switching, full observability, and a REST API for control.
@@ -133,13 +133,15 @@ All configuration is via environment variables. Copy `.env.example` to `.env`.
 | `MAX_DAILY_LOSS_PCT` | `3.0` | Daily loss circuit breaker |
 | `MAX_CONSECUTIVE_LOSSES` | `3` | Consecutive loss limit |
 | `COOLDOWN_MINUTES_AFTER_LOSSES` | `60` | Pause after max consecutive losses |
-| `MAX_TRADES_PER_DAY` | `10` | Maximum trades per calendar day |
+| `MAX_TRADES_PER_DAY` | `10` | Maximum trades per calendar day (UTC) |
 | `EMA_FAST` | `9` | Fast EMA period |
 | `EMA_SLOW` | `21` | Slow EMA period |
 | `ATR_PERIOD` | `14` | ATR lookback period |
 | `VOLUME_MULTIPLIER` | `1.5` | Volume confirmation multiplier |
 | `API_SECRET_KEY` | `change_me…` | Bearer token for API auth |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./data/bobrito.db` | Database connection string |
+
+See [Configuration Changes in v1.3](#configuration-changes-in-v13) for additional v1.3 parameters.
 
 ---
 
@@ -159,8 +161,8 @@ All configuration is via environment variables. Copy `.env.example` to `.env`.
 
 ### Stop & Target
 
-- Stop: `entry_price − 1.5 × ATR`
-- Target: `entry_price + 3.0 × ATR`
+- Stop: `entry_price − STOP_ATR_MULTIPLIER × ATR` (default 1.5)
+- Target: `entry_price + TARGET_ATR_MULTIPLIER × ATR` (default 3.0)
 - Risk/Reward ≥ 2:1
 
 ### Exit conditions
@@ -169,12 +171,63 @@ All configuration is via environment variables. Copy `.env.example` to `.env`.
 |---------|--------|
 | Stop price hit | Market SELL |
 | Target price hit | Market SELL |
-| Close < fast EMA (1m) | Momentum failure SELL |
+| Momentum failure (v1.3) | See [Momentum Failure Exit](#momentum-failure-exit-v13) below |
 | Emergency stop | Immediate market SELL |
 
 ### Regime filter
 
 No trades are taken when the market is detected as sideways (fast EMA ≈ slow EMA on 5m).
+
+---
+
+## Configuration Changes in v1.3
+
+v1.3 introduces ~25 new configurable parameters, all with sensible defaults. Existing `.env` files continue to work without modification.
+
+| Category | Variables |
+|----------|-----------|
+| Exchange filters | `ALLOW_FILTER_FALLBACK`, `FALLBACK_STEP_SIZE`, `FALLBACK_MIN_QTY`, `FALLBACK_MIN_NOTIONAL`, `FALLBACK_TICK_SIZE` |
+| Strategy | `EMA_MIN_SEPARATION_PCT`, `PULLBACK_LOOKBACK_BARS`, `PULLBACK_NEAR_SLOW_EMA_PCT`, `VOLUME_SMA_PERIOD`, `STOP_ATR_MULTIPLIER`, `TARGET_ATR_MULTIPLIER`, `MIN_1M_WARMUP_CANDLES`, `MIN_5M_WARMUP_CANDLES`, `SWING_LOW_LOOKBACK` |
+| Fee filter | `MIN_EXPECTED_EDGE_ENABLED`, `ESTIMATED_ROUNDTRIP_FEE_BPS`, `ESTIMATED_ROUNDTRIP_SLIPPAGE_BPS`, `MIN_EXPECTED_NET_EDGE_BPS`, `MIN_TARGET_DISTANCE_BPS` |
+| Momentum failure | `MOMENTUM_FAILURE_CONFIRM_BARS`, `MOMENTUM_FAILURE_MIN_HOLD_BARS`, `MOMENTUM_FAILURE_EXIT_EMA` |
+
+---
+
+## Fee-Aware Entry Filter (v1.3)
+
+Before validating an entry, the bot applies a **fee-aware filter** that rejects trades when:
+
+- **Target distance** — The distance from entry to target (in bps) is below `MIN_TARGET_DISTANCE_BPS` (default 45).
+- **Expected net edge** — After subtracting estimated roundtrip fees and slippage (`ESTIMATED_ROUNDTRIP_FEE_BPS` + `ESTIMATED_ROUNDTRIP_SLIPPAGE_BPS`), the expected net edge is below `MIN_EXPECTED_NET_EDGE_BPS` (default 15).
+
+Rejections are persisted as `RiskEvent` with types `MIN_TARGET_DISTANCE` or `MIN_EXPECTED_EDGE`, logged at INFO with computed bps values (distance, net edge, cost) and thresholds, and counted in Prometheus `risk_events_total`. Set `MIN_EXPECTED_EDGE_ENABLED=false` to disable.
+
+---
+
+## Momentum Failure Exit (v1.3)
+
+The momentum-failure exit now requires **two** conditions before triggering:
+
+1. **Min hold bars** — Position must be held for at least `MOMENTUM_FAILURE_MIN_HOLD_BARS` (default 2) 1m candles.
+2. **Confirm bars** — Close must be below the selected exit EMA for `MOMENTUM_FAILURE_CONFIRM_BARS` (default 2) consecutive bars.
+
+The exit EMA is configurable: `MOMENTUM_FAILURE_EXIT_EMA=fast` or `slow`. This reduces false exits from single-bar noise.
+
+---
+
+## UTC Daily Reset Behavior (v1.3)
+
+All daily counters (trades, PnL, midnight reset) use **UTC** via `datetime.utcnow().date()`. The trading day is aligned to UTC midnight, not local time. Limit overrides revert to ENV defaults at midnight UTC.
+
+---
+
+## Exchange Filter Loading (v1.3)
+
+Symbol filters (`stepSize`, `minQty`, `minNotional`, `tickSize`) are now fetched from Binance `exchangeInfo` and used for order quantity/price quantization.
+
+- **Live / Testnet:** If filters cannot be loaded, the bot raises `RuntimeError` and refuses to start (unless `ALLOW_FILTER_FALLBACK=true`).
+- **Paper:** If filters fail, the bot activates safe mode, uses fallback values for quantization, and **blocks all new entries** until safe mode is cleared.
+- **Fallback:** When `ALLOW_FILTER_FALLBACK=true`, fallback values from `.env` are used. **Not recommended for live trading.**
 
 ---
 
@@ -191,6 +244,7 @@ Risk management **overrides** strategy — signals cannot bypass it.
 5. Max daily trades not reached
 6. Minimum free balance maintained
 7. Safe mode not active
+8. Fee-aware filter passed (see [Fee-Aware Entry Filter](#fee-aware-entry-filter-v13))
 
 ### Position sizing
 
@@ -199,11 +253,11 @@ risk_amount = capital × risk_per_trade_pct / 100
 quantity    = risk_amount / stop_distance
 ```
 
-Rounded to exchange `stepSize`, capped by available balance.
+Rounded to exchange `stepSize` ( Decimal-safe quantization), capped by available balance.
 
 ### Safe mode
 
-Activated automatically on critical errors. Blocks all new entries. Cleared manually via `POST /bot/resume` after investigation.
+Activated automatically on critical errors (including exchange filter unavailability in paper mode). **Blocks all new entries.** Cleared manually via `POST /bot/resume` after investigation.
 
 ---
 
@@ -211,7 +265,7 @@ Activated automatically on critical errors. Blocks all new entries. Cleared manu
 
 | Mode | Description |
 |------|-------------|
-| `paper` | In-memory simulation with real market data. No API keys needed. |
+| `paper` | In-memory simulation with real market data. No API keys needed. If exchange filters cannot be loaded, safe mode activates and **no new entries are opened**. |
 | `testnet` | Orders sent to Binance Spot Testnet. Requires testnet API keys. |
 | `live` | Real orders. Requires `LIVE_TRADING_ENABLED=true` + live API keys. |
 
@@ -417,7 +471,7 @@ bobrito/
 3. **Test on testnet** — verify order execution before switching to live.
 4. **Set `LIVE_TRADING_ENABLED=true` deliberately** — this flag prevents accidental live activation.
 5. **Initial capital is 200 USDT** — the bot will never risk more than configured in `RISK_PER_TRADE_PCT`.
-6. **Review daily loss limits** — `MAX_DAILY_LOSS_PCT=3%` means a maximum drawdown of 6 USDT per day on 200 USDT capital.
+6. **Review daily loss limits** — `MAX_DAILY_LOSS_PCT=3%` means a maximum drawdown of 6 USDT per day on 200 USDT capital. Daily counters reset at midnight UTC.
 7. **Futures and leverage are disabled** — v1 is spot-only with no margin.
 8. **Do not expose the Web UI publicly** without authentication. Use `WEB_UI_USERNAME` / `WEB_UI_PASSWORD` and set a strong `WEB_UI_SESSION_SECRET`.
 9. **Start in paper mode** before enabling the UI in production — `BOT_MODE=paper` lets you verify the dashboard works correctly without risk.

@@ -53,7 +53,9 @@ def atr(
     return result
 
 
-def swing_lows(closes: list[float], lows: list[float], lookback: int = 5) -> list[float | None]:
+def swing_lows(
+    closes: list[float], lows: list[float], lookback: int = 5
+) -> list[float | None]:
     """Identify swing-low pivot prices.
 
     A bar at index i is a swing low when its low is lower than the
@@ -69,7 +71,7 @@ def swing_lows(closes: list[float], lows: list[float], lookback: int = 5) -> lis
     return result
 
 
-def volume_sma(volumes: list[float], period: int = 20) -> list[float]:
+def volume_sma(volumes: list[float], period: int) -> list[float]:
     """Simple Moving Average of volume."""
     n = len(volumes)
     result: list[float] = [float("nan")] * n
@@ -91,12 +93,12 @@ def is_pullback(
     closes: list[float],
     ema_slow_series: list[float],
     lookback: int = 5,
+    near_pct: float = 0.2,
 ) -> bool:
     """True when price has recently dipped toward / near the slow EMA.
 
     We look back `lookback` bars and check whether any close was within
-    1 × ATR of the slow EMA (a rough pullback proxy without ATR here—
-    just check close < previous close and close ≥ slow EMA).
+    `near_pct`% of the slow EMA (e.g. near_pct=0.2 → close ≤ slow_ema * 1.002).
     """
     if len(closes) < lookback + 1:
         return False
@@ -104,7 +106,8 @@ def is_pullback(
     slow_val = next((v for v in reversed(ema_slow_series) if not _isnan(v)), None)
     if slow_val is None:
         return False
-    return any(c <= slow_val * 1.002 for c in recent)
+    threshold = slow_val * (1 + near_pct / 100)
+    return any(c <= threshold for c in recent)
 
 
 def is_resuming(closes: list[float], ema_fast_series: list[float]) -> bool:
@@ -127,10 +130,19 @@ def _isnan(v: float) -> bool:
 class Indicators:
     """Convenience wrapper: compute all indicators from candle lists."""
 
-    def __init__(self, ema_fast_period: int = 9, ema_slow_period: int = 21, atr_period: int = 14):
+    def __init__(
+        self,
+        ema_fast_period: int = 9,
+        ema_slow_period: int = 21,
+        atr_period: int = 14,
+        volume_sma_period: int = 20,
+        swing_low_lookback: int = 5,
+    ):
         self.ema_fast_period = ema_fast_period
         self.ema_slow_period = ema_slow_period
         self.atr_period = atr_period
+        self.volume_sma_period = volume_sma_period
+        self.swing_low_lookback = swing_low_lookback
 
     def compute(self, candles: list) -> dict:
         """
@@ -151,8 +163,8 @@ class Indicators:
         ema_fast_series = ema(closes, self.ema_fast_period)
         ema_slow_series = ema(closes, self.ema_slow_period)
         atr_series = atr(highs, lows, closes, self.atr_period)
-        swings = swing_lows(closes, lows)
-        vol_sma = volume_sma(volumes)
+        swings = swing_lows(closes, lows, self.swing_low_lookback)
+        vol_sma = volume_sma(volumes, self.volume_sma_period)
 
         return {
             "closes": closes,

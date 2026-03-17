@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     initial_capital_usdt: float = 200.0
     paper_initial_usdt: float = 200.0
 
+    # ── Exchange filters (fallback when exchangeInfo unavailable) ──────────────
+    allow_filter_fallback: bool = False
+    fallback_step_size: float = 0.00001
+    fallback_min_qty: float = 0.00001
+    fallback_min_notional: float = 5.0
+    fallback_tick_size: float = 0.01
+
     # ── Strategy ─────────────────────────────────────────────────────────────
     ema_fast: int = 9
     ema_slow: int = 21
@@ -62,6 +69,28 @@ class Settings(BaseSettings):
     trend_interval: str = "5m"
     entry_interval: str = "1m"
     candle_buffer_size: int = 500
+    # Newly externalised strategy params
+    ema_min_separation_pct: float = 0.05
+    pullback_lookback_bars: int = 5
+    pullback_near_slow_ema_pct: float = 0.2
+    volume_sma_period: int = 20
+    stop_atr_multiplier: float = 1.5
+    target_atr_multiplier: float = 3.0
+    min_1m_warmup_candles: int = 30
+    min_5m_warmup_candles: int = 25
+    swing_low_lookback: int = 5
+
+    # ── Fee-aware entry filter ────────────────────────────────────────────────
+    min_expected_edge_enabled: bool = True
+    estimated_roundtrip_fee_bps: float = 20.0
+    estimated_roundtrip_slippage_bps: float = 10.0
+    min_expected_net_edge_bps: float = 15.0
+    min_target_distance_bps: float = 45.0
+
+    # ── Momentum Failure exit ─────────────────────────────────────────────────
+    momentum_failure_confirm_bars: int = 2
+    momentum_failure_min_hold_bars: int = 2
+    momentum_failure_exit_ema: str = "fast"
 
     # ── Risk ─────────────────────────────────────────────────────────────────
     risk_per_trade_pct: float = Field(0.75, ge=0.1, le=2.0)

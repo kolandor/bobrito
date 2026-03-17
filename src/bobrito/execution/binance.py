@@ -9,6 +9,7 @@ Safety: Live trading requires `live_trading_enabled=True` in settings.
 from __future__ import annotations
 
 import hashlib
+from decimal import Decimal
 import hmac
 import time
 import uuid
@@ -25,6 +26,7 @@ from bobrito.execution.base import (
     OrderSide,
     OrderStatus,
     OrderType,
+    SymbolFilters,
 )
 from bobrito.monitoring.logger import get_logger
 from bobrito.monitoring.metrics import MetricsCollector
@@ -46,6 +48,7 @@ class BinanceBroker(BrokerBase):
         self._secret = api_secret
         self._base = base_url.rstrip("/")
         self._mode = mode
+        self._filters: dict[str, SymbolFilters] = {}
         self._client = httpx.AsyncClient(
             base_url=self._base,
             headers={"X-MBX-APIKEY": self._key},
@@ -62,16 +65,21 @@ class BinanceBroker(BrokerBase):
         if not request.client_order_id:
             request.client_order_id = str(uuid.uuid4()).replace("-", "")[:36]
 
+        filters = await self.get_symbol_filters(request.symbol)
+        if filters is None:
+            raise RuntimeError("Symbol filters unavailable; cannot place order safely")
+
+        qty_str = str(filters.quantize_qty(request.quantity))
         params: dict = {
             "symbol": request.symbol,
             "side": request.side.value,
             "type": request.order_type.value,
-            "quantity": f"{request.quantity:.8f}",
+            "quantity": qty_str,
             "newClientOrderId": request.client_order_id,
             "newOrderRespType": "FULL",
         }
         if request.order_type == OrderType.LIMIT and request.price:
-            params["price"] = f"{request.price:.2f}"
+            params["price"] = str(filters.quantize_price(request.price))
             params["timeInForce"] = "GTC"
 
         data = await self._signed_post("/api/v3/order", params)
@@ -154,19 +162,40 @@ class BinanceBroker(BrokerBase):
         return balances
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=4))
-    async def get_symbol_filters(self, symbol: str) -> dict:
+    async def get_symbol_filters(self, symbol: str) -> SymbolFilters | None:
+        if symbol in self._filters:
+            return self._filters[symbol]
         resp = await self._client.get("/api/v3/exchangeInfo", params={"symbol": symbol})
+        if resp.is_error:
+            return None
         info = resp.json()
-        result = {"step_size": 0.00001, "min_qty": 0.00001, "min_notional": 5.0}
+        step_size = Decimal("0.00001")
+        min_qty = Decimal("0.00001")
+        min_notional = Decimal("5.0")
+        tick_size = Decimal("0.01")
         for sym_info in info.get("symbols", []):
             if sym_info["symbol"] == symbol:
                 for f in sym_info.get("filters", []):
-                    if f["filterType"] == "LOT_SIZE":
-                        result["step_size"] = float(f["stepSize"])
-                        result["min_qty"] = float(f["minQty"])
-                    elif f["filterType"] == "NOTIONAL":
-                        result["min_notional"] = float(f.get("minNotional", 5.0))
-        return result
+                    ft = f.get("filterType", "")
+                    if ft == "LOT_SIZE":
+                        step_size = Decimal(str(f["stepSize"]))
+                        min_qty = Decimal(str(f["minQty"]))
+                    elif ft == "NOTIONAL":
+                        min_notional = Decimal(str(f.get("minNotional", 5.0)))
+                    elif ft == "MIN_NOTIONAL":
+                        min_notional = Decimal(str(f.get("minNotional", 5.0)))
+                    elif ft == "PRICE_FILTER":
+                        tick_size = Decimal(str(f["tickSize"]))
+                break
+        filters = SymbolFilters(
+            symbol=symbol,
+            step_size=step_size,
+            min_qty=min_qty,
+            min_notional=min_notional,
+            tick_size=tick_size,
+        )
+        self._filters[symbol] = filters
+        return filters
 
     # ── Signed request helpers ─────────────────────────────────────────────
 

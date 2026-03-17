@@ -7,10 +7,23 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from decimal import Decimal
+
+from bobrito.execution.base import SymbolFilters
 from bobrito.risk.manager import RiskManager, _round_step
 from bobrito.strategy.base import Signal, SignalType
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def make_symbol_filters(step_size: float = 0.00001, min_qty: float = 0.00001, min_notional: float = 5.0) -> SymbolFilters:
+    return SymbolFilters(
+        symbol="BTCUSDT",
+        step_size=Decimal(str(step_size)),
+        min_qty=Decimal(str(min_qty)),
+        min_notional=Decimal(str(min_notional)),
+        tick_size=Decimal("0.01"),
+    )
 
 def make_settings(**overrides):
     from bobrito.config.settings import Settings
@@ -73,7 +86,7 @@ class TestPositionSizing:
             min_free_balance_usdt=0.0,
         )
         rm = RiskManager(settings, make_db_mock())
-        rm.configure_filters(step_size=0.00001, min_qty=0.00001, min_notional=5.0)
+        rm.configure_filters(make_symbol_filters())
 
         price = 40000.0
         stop = 39000.0
@@ -95,7 +108,7 @@ class TestPositionSizing:
             min_free_balance_usdt=0.0,
         )
         rm = RiskManager(settings, make_db_mock())
-        rm.configure_filters(step_size=0.00001, min_qty=0.00001, min_notional=5.0)
+        rm.configure_filters(make_symbol_filters())
 
         # Only 50 USDT free → max qty at 40000 = 0.00125 BTC
         qty, _ = rm._calculate_position_size(40000.0, 1000.0, free_usdt=50.0)
@@ -107,7 +120,7 @@ class TestRiskRules:
     async def test_allows_trade_when_clean(self):
         settings = make_settings()
         rm = RiskManager(settings, make_db_mock())
-        rm.configure_filters(0.00001, 0.00001, 5.0)
+        rm.configure_filters(make_symbol_filters())
         decision = await rm.validate_entry(make_signal(), free_usdt=500.0, has_open_position=False)
         assert decision.allowed
 
@@ -121,7 +134,7 @@ class TestRiskRules:
     async def test_blocks_daily_loss(self):
         settings = make_settings(initial_capital_usdt=1000.0, max_daily_loss_pct=3.0)
         rm = RiskManager(settings, make_db_mock())
-        rm.configure_filters(0.00001, 0.00001, 5.0)
+        rm.configure_filters(make_symbol_filters())
         # Simulate -35 USDT daily loss (> 3% of 1000)
         rm._daily_realised_pnl = -35.0
         decision = await rm.validate_entry(make_signal(), free_usdt=500.0, has_open_position=False)
@@ -131,7 +144,7 @@ class TestRiskRules:
     async def test_blocks_consecutive_losses(self):
         settings = make_settings(max_consecutive_losses=3)
         rm = RiskManager(settings, make_db_mock())
-        rm.configure_filters(0.00001, 0.00001, 5.0)
+        rm.configure_filters(make_symbol_filters())
         rm._consecutive_losses = 3
         decision = await rm.validate_entry(make_signal(), free_usdt=500.0, has_open_position=False)
         assert not decision.allowed
@@ -139,7 +152,7 @@ class TestRiskRules:
     async def test_blocks_max_trades(self):
         settings = make_settings(max_trades_per_day=5)
         rm = RiskManager(settings, make_db_mock())
-        rm.configure_filters(0.00001, 0.00001, 5.0)
+        rm.configure_filters(make_symbol_filters())
         rm._daily_trades = 5
         decision = await rm.validate_entry(make_signal(), free_usdt=500.0, has_open_position=False)
         assert not decision.allowed
@@ -147,7 +160,7 @@ class TestRiskRules:
     async def test_blocks_min_balance(self):
         settings = make_settings(min_free_balance_usdt=100.0)
         rm = RiskManager(settings, make_db_mock())
-        rm.configure_filters(0.00001, 0.00001, 5.0)
+        rm.configure_filters(make_symbol_filters())
         decision = await rm.validate_entry(make_signal(), free_usdt=50.0, has_open_position=False)
         assert not decision.allowed
 

@@ -20,18 +20,12 @@ from bobrito.execution.base import (
     OrderSide,
     OrderStatus,
     OrderType,
+    SymbolFilters,
 )
 from bobrito.monitoring.logger import get_logger
 from bobrito.monitoring.metrics import MetricsCollector
 
 log = get_logger("execution.paper")
-
-# Default symbol filters for BTCUSDT
-_DEFAULT_FILTERS = {
-    "step_size": 0.00001,
-    "min_qty": 0.00001,
-    "min_notional": 5.0,
-}
 
 
 class PaperBroker(BrokerBase):
@@ -51,6 +45,11 @@ class PaperBroker(BrokerBase):
         }
         self._orders: dict[str, OrderResult] = {}
         self._last_price: float = 0.0
+        self._filters: SymbolFilters | None = None
+
+    def set_filters(self, filters: SymbolFilters) -> None:
+        """Configure symbol filters (from engine after loading from exchange or fallback)."""
+        self._filters = filters
 
     # ── Public price update (called by feed) ──────────────────────────────
 
@@ -63,12 +62,42 @@ class PaperBroker(BrokerBase):
         if not request.client_order_id:
             request.client_order_id = str(uuid.uuid4())
 
-        fill_price = self._apply_slippage(self._last_price, request.side)
-
+        qty = request.quantity
+        price = self._apply_slippage(self._last_price, request.side)
         if request.order_type == OrderType.LIMIT and request.price:
-            fill_price = request.price
+            price = request.price
 
-        commission = request.quantity * fill_price * self._fee_rate
+        if self._filters is not None:
+            qty_dec = self._filters.quantize_qty(qty)
+            price_dec = self._filters.quantize_price(price)
+            if not self._filters.check_qty(qty_dec):
+                return OrderResult(
+                    client_order_id=request.client_order_id,
+                    exchange_order_id="",
+                    symbol=request.symbol,
+                    side=request.side,
+                    order_type=request.order_type,
+                    status=OrderStatus.REJECTED,
+                    requested_qty=qty,
+                    raw={"reason": "quantity below min_qty or invalid step"},
+                )
+            if not self._filters.check_notional(qty_dec, price_dec):
+                return OrderResult(
+                    client_order_id=request.client_order_id,
+                    exchange_order_id="",
+                    symbol=request.symbol,
+                    side=request.side,
+                    order_type=request.order_type,
+                    status=OrderStatus.REJECTED,
+                    requested_qty=qty,
+                    raw={"reason": "notional below min_notional"},
+                )
+            qty = float(qty_dec)
+            fill_price = float(price_dec)
+        else:
+            fill_price = price
+
+        commission = qty * fill_price * self._fee_rate
         commission_asset = "USDT"
 
         result = OrderResult(
@@ -79,7 +108,7 @@ class PaperBroker(BrokerBase):
             order_type=request.order_type,
             status=OrderStatus.FILLED,
             requested_qty=request.quantity,
-            filled_qty=request.quantity,
+            filled_qty=qty,
             average_price=fill_price,
             commission=commission,
             commission_asset=commission_asset,
@@ -90,7 +119,7 @@ class PaperBroker(BrokerBase):
         self._apply_fill(result)
 
         log.info(
-            f"[PAPER] {request.side.value} {request.quantity:.6f} BTC "
+            f"[PAPER] {request.side.value} {qty:.6f} BTC "
             f"@ {fill_price:.2f} | fee={commission:.4f} USDT"
         )
         MetricsCollector.trades_total.labels(side=request.side.value, mode="paper").inc()
@@ -111,8 +140,8 @@ class PaperBroker(BrokerBase):
             for asset, data in self._balances.items()
         }
 
-    async def get_symbol_filters(self, symbol: str) -> dict:
-        return dict(_DEFAULT_FILTERS)
+    async def get_symbol_filters(self, symbol: str) -> SymbolFilters | None:
+        return self._filters
 
     # ── Internal helpers ──────────────────────────────────────────────────
 

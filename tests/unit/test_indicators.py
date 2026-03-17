@@ -8,6 +8,7 @@ from bobrito.strategy.indicators import (
     Indicators,
     atr,
     ema,
+    is_pullback,
     is_resuming,
     is_uptrend,
     swing_lows,
@@ -138,6 +139,19 @@ class TestRegimeDetectors:
         ema_f = [100.0, 100.5]
         # Both closes above EMA → not a fresh crossover
         assert is_resuming(closes, ema_f) is False
+
+    def test_is_pullback_with_near_pct(self):
+        # slow_ema=100, recent closes near 100.2 (within 0.2% of 100)
+        slow_ema = [float("nan")] * 4 + [100.0] * 6
+        closes = [99.0, 100.0, 100.15, 100.2, 101.0]  # 100.15 and 100.2 within 0.2% of 100
+        assert is_pullback(closes, slow_ema, lookback=3, near_pct=0.2) is True
+
+    def test_is_pullback_false_when_far(self):
+        slow_ema = [float("nan")] * 4 + [100.0] * 6
+        # All recent closes (excl. last) above 100.2 (0.2% above slow EMA)
+        # recent = closes[-(lookback+1):-1] = last 3 before final; need all > 100.2
+        closes = [105.0, 106.0, 107.0, 108.0]
+        assert is_pullback(closes, slow_ema, lookback=3, near_pct=0.2) is False
 
 
 class TestIndicatorsWrapper:

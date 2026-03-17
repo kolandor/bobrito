@@ -7,8 +7,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from decimal import Decimal
+
 from bobrito.config.settings import Settings
-from bobrito.execution.base import OrderRequest, OrderSide, OrderType
+from bobrito.execution.base import (
+    OrderRequest,
+    OrderSide,
+    OrderType,
+    SymbolFilters,
+)
 from bobrito.execution.paper import PaperBroker
 from bobrito.market_data.models import Candle, MarketSnapshot
 from bobrito.risk.manager import RiskManager
@@ -110,7 +117,15 @@ class TestPaperExecutionPipeline:
         db.session = MagicMock(return_value=sess_ctx)
 
         rm = RiskManager(settings, db)
-        rm.configure_filters(step_size=0.00001, min_qty=0.00001, min_notional=5.0)
+        rm.configure_filters(
+            SymbolFilters(
+                symbol="BTCUSDT",
+                step_size=Decimal("0.00001"),
+                min_qty=Decimal("0.00001"),
+                min_notional=Decimal("5.0"),
+                tick_size=Decimal("0.01"),
+            )
+        )
         return rm, settings
 
     async def test_risk_allows_valid_entry(self):

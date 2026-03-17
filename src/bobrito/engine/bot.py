@@ -21,8 +21,16 @@ import time
 import uuid
 from enum import Enum
 
+from decimal import Decimal
+
 from bobrito.config.settings import Settings
-from bobrito.execution.base import BrokerBase, OrderRequest, OrderSide, OrderType
+from bobrito.execution.base import (
+    BrokerBase,
+    OrderRequest,
+    OrderSide,
+    OrderType,
+    SymbolFilters,
+)
 from bobrito.execution.binance import BinanceBroker
 from bobrito.execution.paper import PaperBroker
 from bobrito.market_data.buffer import CandleBuffer
@@ -72,6 +80,18 @@ class TradingBot:
             ema_slow=settings.ema_slow,
             atr_period=settings.atr_period,
             volume_multiplier=settings.volume_multiplier,
+            atr_stop_mult=settings.stop_atr_multiplier,
+            atr_target_mult=settings.target_atr_multiplier,
+            ema_min_separation_pct=settings.ema_min_separation_pct,
+            pullback_lookback_bars=settings.pullback_lookback_bars,
+            pullback_near_slow_ema_pct=settings.pullback_near_slow_ema_pct,
+            volume_sma_period=settings.volume_sma_period,
+            swing_low_lookback=settings.swing_low_lookback,
+            min_1m_warmup=settings.min_1m_warmup_candles,
+            min_5m_warmup=settings.min_5m_warmup_candles,
+            momentum_failure_confirm_bars=settings.momentum_failure_confirm_bars,
+            momentum_failure_min_hold_bars=settings.momentum_failure_min_hold_bars,
+            momentum_failure_exit_ema=settings.momentum_failure_exit_ema,
         )
         self._risk = RiskManager(settings, db)
         self._portfolio = PortfolioManager(settings, db)
@@ -100,11 +120,36 @@ class TradingBot:
         self._broker = self._create_broker()
 
         # Fetch and apply exchange filters
-        try:
-            filters = await self._broker.get_symbol_filters(self._s.symbol)
-            self._risk.configure_filters(**filters)
-        except Exception as exc:
-            log.warning(f"Could not fetch exchange filters: {exc}. Using defaults.")
+        filters = await self._broker.get_symbol_filters(self._s.symbol)
+        if filters is None:
+            if self._s.allow_filter_fallback:
+                log.warning(
+                    "Exchange filters unavailable — using fallback. NOT recommended for live trading."
+                )
+                filters = SymbolFilters(
+                    symbol=self._s.symbol,
+                    step_size=Decimal(str(self._s.fallback_step_size)),
+                    min_qty=Decimal(str(self._s.fallback_min_qty)),
+                    min_notional=Decimal(str(self._s.fallback_min_notional)),
+                    tick_size=Decimal(str(self._s.fallback_tick_size)),
+                )
+            elif self._s.is_live() or self._s.is_testnet():
+                raise RuntimeError(
+                    "Cannot start: exchange filters unavailable. "
+                    "Set ALLOW_FILTER_FALLBACK=true only if you understand the risks."
+                )
+            else:
+                self._risk.activate_safe_mode("Exchange filters unavailable")
+                filters = SymbolFilters(
+                    symbol=self._s.symbol,
+                    step_size=Decimal(str(self._s.fallback_step_size)),
+                    min_qty=Decimal(str(self._s.fallback_min_qty)),
+                    min_notional=Decimal(str(self._s.fallback_min_notional)),
+                    tick_size=Decimal(str(self._s.fallback_tick_size)),
+                )
+        self._risk.configure_filters(filters)
+        if isinstance(self._broker, PaperBroker):
+            self._broker.set_filters(filters)
 
         # ── Historical pre-fill (eliminates EMA warm-up blind period) ────────
         await self._prefill_candle_buffers()
@@ -318,6 +363,20 @@ class TradingBot:
         if self._paused or has_position or signal.signal_type != SignalType.BUY:
             return
 
+        # ── Fee-aware filter (before risk validation) ──────────────────────
+        if signal.target_price:
+            fee_decision = await self._risk.check_fee_filter(
+                signal.price, signal.target_price
+            )
+            if not fee_decision.allowed:
+                log.debug(f"Entry blocked by fee filter: {fee_decision.reason}")
+                async with self._db.session() as sess:
+                    db_row = await sess.get(DBSignal, db_signal.id)
+                    if db_row:
+                        db_row.rejected_reason = fee_decision.reason
+                        await sess.commit()
+                return
+
         # ── Risk validation ───────────────────────────────────────────────
         balances = await self._broker.get_balances()
         free_usdt = balances.get("USDT", 0.0)
@@ -363,6 +422,7 @@ class TradingBot:
             risk_amount=risk_amount,
             signal_id=signal_id,
         )
+        self._strategy.reset_position_tracking()
 
         # Update signal as acted-on
         async with self._db.session() as sess:

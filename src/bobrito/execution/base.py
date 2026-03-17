@@ -2,6 +2,8 @@
 
 All broker implementations must subclass BrokerBase so that the strategy
 and bot engine remain broker-agnostic.
+
+SymbolFilters is the canonical typed model for exchange symbol constraints.
 """
 
 from __future__ import annotations
@@ -9,6 +11,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal, ROUND_DOWN
+from typing import Union
 from enum import Enum
 
 
@@ -66,6 +70,35 @@ class OrderResult:
         return self.filled_qty * self.average_price
 
 
+@dataclass(frozen=True)
+class SymbolFilters:
+    """Canonical exchange symbol constraints. Use Decimal for precision-critical ops."""
+
+    symbol: str
+    step_size: Decimal
+    min_qty: Decimal
+    min_notional: Decimal
+    tick_size: Decimal
+
+    def quantize_qty(self, qty: Union[float, Decimal]) -> Decimal:
+        """Round quantity down to step_size precision. Decimal-safe: never uses float internally."""
+        d = qty if isinstance(qty, Decimal) else Decimal(str(qty))
+        return d.quantize(self.step_size, rounding=ROUND_DOWN)
+
+    def quantize_price(self, price: Union[float, Decimal]) -> Decimal:
+        """Round price to tick_size precision. Decimal-safe: never uses float internally."""
+        d = price if isinstance(price, Decimal) else Decimal(str(price))
+        return d.quantize(self.tick_size, rounding=ROUND_DOWN)
+
+    def check_qty(self, qty: Decimal) -> bool:
+        """True if quantity meets min_qty and step alignment."""
+        return qty >= self.min_qty and qty == self.quantize_qty(qty)
+
+    def check_notional(self, qty: Decimal, price: Decimal) -> bool:
+        """True if qty * price meets min_notional."""
+        return qty * price >= self.min_notional
+
+
 class BrokerBase(ABC):
     """Abstract broker interface."""
 
@@ -87,6 +120,6 @@ class BrokerBase(ABC):
         ...
 
     @abstractmethod
-    async def get_symbol_filters(self, symbol: str) -> dict:
-        """Return exchange filter info: step_size, min_qty, min_notional."""
+    async def get_symbol_filters(self, symbol: str) -> SymbolFilters | None:
+        """Return exchange symbol filters, or None if unavailable."""
         ...

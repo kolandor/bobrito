@@ -90,11 +90,29 @@ class TestPaperBrokerSlippage:
 
 class TestPaperBrokerFilters:
     @pytest.mark.asyncio
-    async def test_get_symbol_filters(self, broker: PaperBroker):
+    async def test_get_symbol_filters_returns_none_when_not_set(self, broker: PaperBroker):
         filters = await broker.get_symbol_filters("BTCUSDT")
-        assert "step_size" in filters
-        assert "min_qty" in filters
-        assert "min_notional" in filters
+        assert filters is None
+
+    @pytest.mark.asyncio
+    async def test_get_symbol_filters_returns_filters_when_set(self, broker: PaperBroker):
+        from decimal import Decimal
+
+        from bobrito.execution.base import SymbolFilters
+
+        f = SymbolFilters(
+            symbol="BTCUSDT",
+            step_size=Decimal("0.00001"),
+            min_qty=Decimal("0.00001"),
+            min_notional=Decimal("5.0"),
+            tick_size=Decimal("0.01"),
+        )
+        broker.set_filters(f)
+        filters = await broker.get_symbol_filters("BTCUSDT")
+        assert filters is not None
+        assert filters.step_size == Decimal("0.00001")
+        assert filters.min_qty == Decimal("0.00001")
+        assert filters.min_notional == Decimal("5.0")
 
 
 class TestPaperBrokerCancelOrder:
