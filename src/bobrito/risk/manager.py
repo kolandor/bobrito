@@ -269,16 +269,15 @@ class RiskManager:
     # ── Runtime limit management ──────────────────────────────────────────
 
     async def reset_cooldown(self) -> None:
-        """Clear the active post-loss cooldown timer and reset the loss streak.
+        """Clear the active post-loss cooldown timer.
 
         This is a conscious operator override — use when you have reviewed
         the situation and want to allow new entries before the cooldown expires.
-        Resets automatically at midnight UTC together with all other overrides.
+        The consecutive loss streak is unaffected; only the timer is cleared.
         """
         async with self._lock:
             self._last_loss_time = None
-            self._consecutive_losses = 0
-        log.info("Post-loss cooldown and consecutive loss streak manually reset by operator.")
+        log.info("Post-loss cooldown timer manually reset by operator (consecutive loss streak unchanged).")
 
     def set_max_consecutive_losses(self, value: int) -> None:
         """Override the max consecutive losses limit (session-scoped)."""
