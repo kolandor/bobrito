@@ -308,6 +308,28 @@ class RiskManager:
         self._max_trades_per_day_override = None
         log.info("Risk limit overrides cleared — reverting to ENV-file defaults.")
 
+    async def run_midnight_reset_loop(self) -> None:
+        """Background task: reset daily counters and clear overrides at midnight UTC.
+
+        Provides reliable midnight resets independent of trade activity.
+        Cancelled automatically when the bot stops.
+        """
+        while True:
+            now = datetime.utcnow()
+            tomorrow = datetime(now.year, now.month, now.day) + timedelta(days=1)
+            sleep_secs = (tomorrow - now).total_seconds()
+            log.info(
+                f"Midnight reset scheduled in "
+                f"{int(sleep_secs // 3600)}h {int((sleep_secs % 3600) // 60)}m"
+            )
+            await asyncio.sleep(sleep_secs)
+            async with self._lock:
+                self._daily_trades = 0
+                self._daily_realised_pnl = 0.0
+                self._current_day = date.today()
+                self.restore_defaults()
+                log.info(f"Midnight UTC: daily counters + overrides reset for {self._current_day}")
+
     def has_overrides(self) -> bool:
         """Return True if any limit is currently overridden from its ENV default."""
         return any([

@@ -43,6 +43,19 @@ def _make_mock_bot(status: str = "running"):
     risk.state_dict.return_value = {
         "safe_mode": False, "daily_trades": 0, "daily_pnl": 0.0,
         "consecutive_losses": 0, "current_day": "2026-03-15",
+        "limits": {
+            "max_consecutive_losses": 3,
+            "max_daily_loss_pct": 3.0,
+            "min_free_balance_usdt": 50.0,
+            "max_trades_per_day": 10,
+        },
+        "defaults": {
+            "max_consecutive_losses": 3,
+            "max_daily_loss_pct": 3.0,
+            "min_free_balance_usdt": 50.0,
+            "max_trades_per_day": 10,
+        },
+        "has_overrides": False,
     }
     bot.get_risk.return_value = risk
     bot.get_last_snapshot.return_value = None
