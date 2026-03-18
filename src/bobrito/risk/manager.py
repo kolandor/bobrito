@@ -27,10 +27,10 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func, select
 
 from bobrito.config.settings import Settings
+from bobrito.execution.base import SymbolFilters
 from bobrito.monitoring.logger import get_logger
 from bobrito.monitoring.metrics import MetricsCollector
 from bobrito.persistence.database import DatabaseManager
-from bobrito.execution.base import SymbolFilters
 from bobrito.persistence.models import (
     Position,
     PositionStatus,
@@ -209,8 +209,7 @@ class RiskManager:
 
         distance_to_target_bps = (target_price - entry_price) / entry_price * 10_000
         estimated_roundtrip_cost_bps = (
-            self._s.estimated_roundtrip_fee_bps
-            + self._s.estimated_roundtrip_slippage_bps
+            self._s.estimated_roundtrip_fee_bps + self._s.estimated_roundtrip_slippage_bps
         )
         expected_net_edge_bps = distance_to_target_bps - estimated_roundtrip_cost_bps
 
@@ -292,9 +291,7 @@ class RiskManager:
             if stop_distance <= 0:
                 return RiskDecision(allowed=False, reason="Invalid stop distance (≤ 0)")
 
-            qty, risk_amount = self._calculate_position_size(
-                signal.price, stop_distance, free_usdt
-            )
+            qty, risk_amount = self._calculate_position_size(signal.price, stop_distance, free_usdt)
             if qty <= 0:
                 return RiskDecision(
                     allowed=False, reason="Calculated quantity too small for exchange filters"
@@ -352,27 +349,37 @@ class RiskManager:
         """
         async with self._lock:
             self._last_loss_time = None
-        log.info("Post-loss cooldown timer manually reset by operator (consecutive loss streak unchanged).")
+        log.info(
+            "Post-loss cooldown timer manually reset by operator (consecutive loss streak unchanged)."
+        )
 
     def set_max_consecutive_losses(self, value: int) -> None:
         """Override the max consecutive losses limit (session-scoped)."""
         self._max_consecutive_losses_override = value
-        log.info(f"max_consecutive_losses overridden to {value} (default: {self._s.max_consecutive_losses})")
+        log.info(
+            f"max_consecutive_losses overridden to {value} (default: {self._s.max_consecutive_losses})"
+        )
 
     def set_max_daily_loss_pct(self, value: float) -> None:
         """Override the daily PnL loss limit in percent (session-scoped)."""
         self._max_daily_loss_pct_override = value
-        log.info(f"max_daily_loss_pct overridden to {value}% (default: {self._s.max_daily_loss_pct}%)")
+        log.info(
+            f"max_daily_loss_pct overridden to {value}% (default: {self._s.max_daily_loss_pct}%)"
+        )
 
     def set_min_free_balance_usdt(self, value: float) -> None:
         """Override the minimum free balance reserve in USDT (session-scoped)."""
         self._min_free_balance_usdt_override = value
-        log.info(f"min_free_balance_usdt overridden to {value} (default: {self._s.min_free_balance_usdt})")
+        log.info(
+            f"min_free_balance_usdt overridden to {value} (default: {self._s.min_free_balance_usdt})"
+        )
 
     def set_max_trades_per_day(self, value: int) -> None:
         """Override the daily trade count limit (session-scoped)."""
         self._max_trades_per_day_override = value
-        log.info(f"max_trades_per_day overridden to {value} (default: {self._s.max_trades_per_day})")
+        log.info(
+            f"max_trades_per_day overridden to {value} (default: {self._s.max_trades_per_day})"
+        )
 
     def restore_defaults(self) -> None:
         """Restore all runtime limit overrides to their ENV-file values."""
@@ -406,12 +413,14 @@ class RiskManager:
 
     def has_overrides(self) -> bool:
         """Return True if any limit is currently overridden from its ENV default."""
-        return any([
-            self._max_consecutive_losses_override is not None,
-            self._max_daily_loss_pct_override is not None,
-            self._min_free_balance_usdt_override is not None,
-            self._max_trades_per_day_override is not None,
-        ])
+        return any(
+            [
+                self._max_consecutive_losses_override is not None,
+                self._max_daily_loss_pct_override is not None,
+                self._min_free_balance_usdt_override is not None,
+                self._max_trades_per_day_override is not None,
+            ]
+        )
 
     def limits_dict(self) -> dict:
         """Return current effective and default limit values."""
@@ -486,58 +495,66 @@ class RiskManager:
 
         # Safe mode (survives restarts)
         if self._safe_mode:
-            blocks.append({
-                "type": "safe_mode",
-                "name": "Safe Mode",
-                "reason": "A critical runtime error forced the bot into safe mode. All new entries are blocked.",
-                "reset_tip": "Restart the bot process to clear safe mode.",
-                "severity": "critical",
-            })
+            blocks.append(
+                {
+                    "type": "safe_mode",
+                    "name": "Safe Mode",
+                    "reason": "A critical runtime error forced the bot into safe mode. All new entries are blocked.",
+                    "reset_tip": "Restart the bot process to clear safe mode.",
+                    "severity": "critical",
+                }
+            )
 
         # Daily counters only apply for the current trading day
         if not is_new_day:
             capital = self._s.initial_capital_usdt
             max_daily_loss = capital * self._eff_max_daily_loss_pct / 100
             if self._daily_realised_pnl <= -max_daily_loss:
-                blocks.append({
-                    "type": "daily_loss",
-                    "name": "Daily Loss Limit",
-                    "reason": (
-                        f"Today's realised loss ({abs(self._daily_realised_pnl):.4f} USDT) "
-                        f"reached the {self._eff_max_daily_loss_pct}% daily limit "
-                        f"({max_daily_loss:.2f} USDT on {capital:.0f} USDT capital)."
-                    ),
-                    "reset_tip": "Resets automatically at midnight UTC (start of the next trading day).",
-                    "severity": "critical",
-                })
+                blocks.append(
+                    {
+                        "type": "daily_loss",
+                        "name": "Daily Loss Limit",
+                        "reason": (
+                            f"Today's realised loss ({abs(self._daily_realised_pnl):.4f} USDT) "
+                            f"reached the {self._eff_max_daily_loss_pct}% daily limit "
+                            f"({max_daily_loss:.2f} USDT on {capital:.0f} USDT capital)."
+                        ),
+                        "reset_tip": "Resets automatically at midnight UTC (start of the next trading day).",
+                        "severity": "critical",
+                    }
+                )
 
             if self._daily_trades >= self._eff_max_trades_per_day:
-                blocks.append({
-                    "type": "max_trades",
-                    "name": "Daily Trade Limit",
-                    "reason": (
-                        f"{self._daily_trades} trades executed today "
-                        f"(configured limit: {self._eff_max_trades_per_day})."
-                    ),
-                    "reset_tip": "Resets automatically at midnight UTC (start of the next trading day).",
-                    "severity": "warning",
-                })
+                blocks.append(
+                    {
+                        "type": "max_trades",
+                        "name": "Daily Trade Limit",
+                        "reason": (
+                            f"{self._daily_trades} trades executed today "
+                            f"(configured limit: {self._eff_max_trades_per_day})."
+                        ),
+                        "reset_tip": "Resets automatically at midnight UTC (start of the next trading day).",
+                        "severity": "warning",
+                    }
+                )
 
         # Consecutive losses (persists across days)
         if self._consecutive_losses >= self._eff_max_consecutive_losses:
-            blocks.append({
-                "type": "consecutive_losses",
-                "name": "Consecutive Loss Limit",
-                "reason": (
-                    f"{self._consecutive_losses} consecutive losing trades "
-                    f"reached the limit of {self._eff_max_consecutive_losses}."
-                ),
-                "reset_tip": (
-                    "Clears automatically after the next profitable trade closes. "
-                    f"Current losing streak: {self._consecutive_losses}."
-                ),
-                "severity": "warning",
-            })
+            blocks.append(
+                {
+                    "type": "consecutive_losses",
+                    "name": "Consecutive Loss Limit",
+                    "reason": (
+                        f"{self._consecutive_losses} consecutive losing trades "
+                        f"reached the limit of {self._eff_max_consecutive_losses}."
+                    ),
+                    "reset_tip": (
+                        "Clears automatically after the next profitable trade closes. "
+                        f"Current losing streak: {self._consecutive_losses}."
+                    ),
+                    "severity": "warning",
+                }
+            )
 
         # Cooldown timer
         if self._last_loss_time and self._s.cooldown_minutes_after_losses > 0:
@@ -547,34 +564,38 @@ class RiskManager:
             if now < cooldown_end:
                 remaining = int((cooldown_end - now).total_seconds())
                 mins, secs = divmod(remaining, 60)
-                blocks.append({
-                    "type": "cooldown",
-                    "name": "Post-Loss Cooldown",
-                    "reason": (
-                        f"Mandatory cooldown period is active after a losing trade. "
-                        f"{mins}m {secs:02d}s remaining out of "
-                        f"{self._s.cooldown_minutes_after_losses} min total."
-                    ),
-                    "reset_tip": f"Lifts automatically in {mins}m {secs:02d}s. No action needed.",
-                    "severity": "warning",
-                    "remaining_seconds": remaining,
-                })
+                blocks.append(
+                    {
+                        "type": "cooldown",
+                        "name": "Post-Loss Cooldown",
+                        "reason": (
+                            f"Mandatory cooldown period is active after a losing trade. "
+                            f"{mins}m {secs:02d}s remaining out of "
+                            f"{self._s.cooldown_minutes_after_losses} min total."
+                        ),
+                        "reset_tip": f"Lifts automatically in {mins}m {secs:02d}s. No action needed.",
+                        "severity": "warning",
+                        "remaining_seconds": remaining,
+                    }
+                )
 
         # Minimum free balance (optional — only checked when balance is known)
         if free_usdt is not None and free_usdt < self._eff_min_free_balance_usdt:
-            blocks.append({
-                "type": "min_balance",
-                "name": "Minimum Balance Reserve",
-                "reason": (
-                    f"Free USDT ({free_usdt:.2f}) is below the required minimum "
-                    f"({self._eff_min_free_balance_usdt:.2f} USDT)."
-                ),
-                "reset_tip": (
-                    "Recovers automatically when the open position is closed "
-                    "and USDT is returned to the account."
-                ),
-                "severity": "warning",
-            })
+            blocks.append(
+                {
+                    "type": "min_balance",
+                    "name": "Minimum Balance Reserve",
+                    "reason": (
+                        f"Free USDT ({free_usdt:.2f}) is below the required minimum "
+                        f"({self._eff_min_free_balance_usdt:.2f} USDT)."
+                    ),
+                    "reset_tip": (
+                        "Recovers automatically when the open position is closed "
+                        "and USDT is returned to the account."
+                    ),
+                    "severity": "warning",
+                }
+            )
 
         return blocks
 
@@ -718,5 +739,5 @@ def _round_step(qty: float, step: float) -> float:
     if step <= 0:
         return qty
     precision = max(0, int(round(-math.log10(step))))
-    factor = 10 ** precision
+    factor = 10**precision
     return math.floor(qty * factor) / factor

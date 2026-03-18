@@ -23,7 +23,7 @@ they are historical bars that the exchange has already confirmed.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -71,9 +71,7 @@ class HistoricalLoader:
         """
         limit = min(limit, _MAX_LIMIT - 1)  # leave room to drop the open bar
 
-        log.info(
-            f"Pre-filling candle buffers | symbol={self._symbol} limit={limit}"
-        )
+        log.info(f"Pre-filling candle buffers | symbol={self._symbol} limit={limit}")
 
         candles_1m = await self._fetch("1m", limit)
         for c in candles_1m:
@@ -95,7 +93,7 @@ class HistoricalLoader:
         params = {
             "symbol": self._symbol,
             "interval": interval,
-            "limit": limit + 1,   # +1 so we can drop the open bar
+            "limit": limit + 1,  # +1 so we can drop the open bar
         }
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
@@ -121,7 +119,7 @@ class HistoricalLoader:
 def _row_to_candle(row: list, interval: str) -> Candle:
     """Convert a single Binance kline REST row to a Candle dataclass."""
     return Candle(
-        open_time=datetime.fromtimestamp(row[0] / 1000, tz=timezone.utc).replace(tzinfo=None),
+        open_time=datetime.fromtimestamp(row[0] / 1000, tz=UTC).replace(tzinfo=None),
         open=float(row[1]),
         high=float(row[2]),
         low=float(row[3]),

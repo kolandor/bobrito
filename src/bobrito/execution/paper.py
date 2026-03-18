@@ -135,10 +135,7 @@ class PaperBroker(BrokerBase):
         return self._orders.get(order_id)
 
     async def get_balances(self) -> dict[str, float]:
-        return {
-            asset: data["free"]
-            for asset, data in self._balances.items()
-        }
+        return {asset: data["free"] for asset, data in self._balances.items()}
 
     async def get_symbol_filters(self, symbol: str) -> SymbolFilters | None:
         return self._filters
@@ -171,10 +168,7 @@ class PaperBroker(BrokerBase):
         """
         self._balances["USDT"]["free"] = max(free_usdt, 0.0)
         self._balances["BTC"]["free"] = max(free_btc, 0.0)
-        log.info(
-            f"[PAPER] Balances restored from DB: "
-            f"USDT={free_usdt:.2f} BTC={free_btc:.6f}"
-        )
+        log.info(f"[PAPER] Balances restored from DB: " f"USDT={free_usdt:.2f} BTC={free_btc:.6f}")
 
     def get_full_balances(self) -> dict:
         return {k: dict(v) for k, v in self._balances.items()}

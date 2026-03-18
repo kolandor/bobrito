@@ -49,7 +49,9 @@ class TrendPullbackStrategy:
         momentum_failure_exit_ema: str = "fast",
     ) -> None:
         self._ind = Indicators(
-            ema_fast, ema_slow, atr_period,
+            ema_fast,
+            ema_slow,
+            atr_period,
             volume_sma_period=volume_sma_period,
             swing_low_lookback=swing_low_lookback,
         )

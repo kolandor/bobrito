@@ -6,17 +6,16 @@ duplicated here; this module only formats and aggregates for display.
 
 from __future__ import annotations
 
-import time
 from datetime import datetime
 
 from sqlalchemy import and_, desc, or_, select
 
 from bobrito.config.settings import Settings
 from bobrito.engine.bot import BotStatus, TradingBot
-from bobrito.risk.manager import RiskManager
 from bobrito.monitoring.logger import get_logger
 from bobrito.persistence.database import DatabaseManager
 from bobrito.persistence.models import ErrorLog, Position, PositionStatus, Signal, SystemEvent
+from bobrito.risk.manager import RiskManager
 from bobrito.ui.viewmodels import (
     BalancesVM,
     BotStatusVM,
@@ -83,7 +82,7 @@ _STATUS_STYLES: dict[str, tuple[str, str]] = {
 }
 
 
-def _blocks_from_risk(risk: "RiskManager") -> "list[RiskBlockVM]":
+def _blocks_from_risk(risk: RiskManager) -> list[RiskBlockVM]:
     """Convert raw block dicts from RiskManager into RiskBlockVM instances."""
     return [
         RiskBlockVM(
@@ -96,6 +95,7 @@ def _blocks_from_risk(risk: "RiskManager") -> "list[RiskBlockVM]":
         )
         for b in risk.check_entry_blocks()
     ]
+
 
 def _compute_ema_series(closes: list[float], period: int) -> list[float | None]:
     """Return EMA series aligned with *closes* (None during warmup period)."""
@@ -124,10 +124,14 @@ def _signal_friendly(
     r = raw.lower()
 
     if signal_type == "BUY":
-        parts = ["All entry conditions met: 5-min uptrend confirmed, 1-min pullback detected, momentum resuming, volume above average."]
+        parts = [
+            "All entry conditions met: 5-min uptrend confirmed, 1-min pullback detected, momentum resuming, volume above average."
+        ]
         if stop_price and target_price:
             rr = (target_price - stop_price) / max(stop_price, 1) * 100
-            parts.append(f"Stop: ${stop_price:,.2f} | Target: ${target_price:,.2f} | R/R ≈ {rr:.1f}%")
+            parts.append(
+                f"Stop: ${stop_price:,.2f} | Target: ${target_price:,.2f} | R/R ≈ {rr:.1f}%"
+            )
         return " ".join(parts)
 
     if signal_type == "EXIT":
@@ -159,7 +163,9 @@ def _signal_friendly(
     if "no_pullback" in raw:
         missing.append("no pullback toward the slow EMA detected on 1-min chart")
     if "no_resumption" in raw:
-        missing.append("momentum resumption not yet confirmed (price has not crossed back above fast EMA)")
+        missing.append(
+            "momentum resumption not yet confirmed (price has not crossed back above fast EMA)"
+        )
     if "low_volume" in raw:
         missing.append("volume is below the required threshold (current bar volume too low)")
     if missing:
@@ -207,15 +213,10 @@ def _trade_explanation(
 
         # Explain fee-dominated loss if gross PnL was positive but net is negative
         fee_note = ""
-        if (
-            exit_price
-            and entry_price
-            and net_pnl is not None
-            and net_pnl < 0
-        ):
+        if exit_price and entry_price and net_pnl is not None and net_pnl < 0:
             gross = (exit_price - entry_price) * quantity
             if gross > 0:
-                fees = gross - net_pnl   # net = gross - fees → fees = gross - net
+                fees = gross - net_pnl  # net = gross - fees → fees = gross - net
                 fee_note = (
                     f"Despite a positive gross price move "
                     f"(+${gross:,.4f} USDT), the net result is a loss of "
@@ -409,9 +410,7 @@ class UIService:
     def get_system_status(self) -> SystemStatusVM:
         d = self._bot.get_status_dict()
         feed_lag = d.get("feed_lag_seconds")
-        ws_connected = (
-            self._bot.status == BotStatus.RUNNING and d.get("snapshot_count", 0) > 0
-        )
+        ws_connected = self._bot.status == BotStatus.RUNNING and d.get("snapshot_count", 0) > 0
         return SystemStatusVM(
             ws_connected=ws_connected,
             feed_lag_seconds=feed_lag,
@@ -433,7 +432,9 @@ class UIService:
                 trades = []
                 for r in rows:
                     pnl = r.net_pnl
-                    reason = r.exit_reason.value if hasattr(r.exit_reason, "value") else r.exit_reason
+                    reason = (
+                        r.exit_reason.value if hasattr(r.exit_reason, "value") else r.exit_reason
+                    )
                     trades.append(
                         TradeVM(
                             id=r.id,
@@ -468,9 +469,7 @@ class UIService:
         try:
             async with db.session() as sess:
                 result = await sess.execute(
-                    select(SystemEvent)
-                    .order_by(desc(SystemEvent.created_at))
-                    .limit(limit)
+                    select(SystemEvent).order_by(desc(SystemEvent.created_at)).limit(limit)
                 )
                 rows = result.scalars().all()
                 return [
@@ -498,13 +497,19 @@ class UIService:
                     select(Signal).order_by(desc(Signal.created_at)).limit(5)
                 )
                 for row in result.scalars().all():
-                    st = row.signal_type.value if hasattr(row.signal_type, "value") else row.signal_type
+                    st = (
+                        row.signal_type.value
+                        if hasattr(row.signal_type, "value")
+                        else row.signal_type
+                    )
                     signals.append(
                         SignalVM(
                             signal_type=st,
                             price=row.price,
                             timestamp=row.created_at.strftime("%H:%M:%S"),
-                            explanation_friendly=_signal_friendly(st, row.explanation, row.stop_price, row.target_price),
+                            explanation_friendly=_signal_friendly(
+                                st, row.explanation, row.stop_price, row.target_price
+                            ),
                             ema_fast=row.ema_fast,
                             ema_slow=row.ema_slow,
                             stop_price=row.stop_price,
@@ -559,9 +564,7 @@ class UIService:
             try:
                 # Build a label→index map for O(1) lookup (last occurrence wins
                 # when two candles share the same HH:MM label, e.g. across hours)
-                label_index: dict[str, int] = {
-                    lbl: i for i, lbl in enumerate(chart_labels)
-                }
+                label_index: dict[str, int] = {lbl: i for i, lbl in enumerate(chart_labels)}
                 # Generous time window: anything opened OR closed within the range
                 async with db.session() as sess:
                     result = await sess.execute(
@@ -586,7 +589,11 @@ class UIService:
                                 chart_open_markers[label_index[lbl]] = pos.entry_price
 
                         # ── Exit marker (only for closed positions) ───────
-                        if pos.closed_at and pos.exit_price is not None and pos.status == PositionStatus.CLOSED:
+                        if (
+                            pos.closed_at
+                            and pos.exit_price is not None
+                            and pos.status == PositionStatus.CLOSED
+                        ):
                             lbl = pos.closed_at.strftime("%H:%M")
                             if lbl in label_index:
                                 idx = label_index[lbl]
@@ -643,7 +650,9 @@ class UIService:
                             price=r.price,
                             timestamp=r.created_at.strftime("%H:%M:%S"),
                             created_at_full=r.created_at.strftime("%Y-%m-%d %H:%M"),
-                            explanation_friendly=_signal_friendly(st, r.explanation, r.stop_price, r.target_price),
+                            explanation_friendly=_signal_friendly(
+                                st, r.explanation, r.stop_price, r.target_price
+                            ),
                             ema_fast=r.ema_fast,
                             ema_slow=r.ema_slow,
                             atr=r.atr,

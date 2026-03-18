@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -98,9 +98,7 @@ def _make_bot(status="running", paused=False, safe_mode=False, snapshot_count=10
     return bot
 
 
-def _make_settings(
-    max_daily_loss_pct=3.0, max_consecutive_losses=3, max_trades_per_day=10
-):
+def _make_settings(max_daily_loss_pct=3.0, max_consecutive_losses=3, max_trades_per_day=10):
     s = MagicMock()
     s.max_daily_loss_pct = max_daily_loss_pct
     s.max_consecutive_losses = max_consecutive_losses

@@ -85,9 +85,7 @@ async def test_paper_mode_filter_fail_activates_safe_mode_and_blocks_entries():
         stop_price=39000.0,
         target_price=43000.0,
     )
-    decision = await bot.get_risk().validate_entry(
-        signal, free_usdt=300.0, has_open_position=False
-    )
+    decision = await bot.get_risk().validate_entry(signal, free_usdt=300.0, has_open_position=False)
     assert not decision.allowed
     assert "safe mode" in decision.reason.lower()
 

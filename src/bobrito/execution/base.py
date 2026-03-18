@@ -11,22 +11,21 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal, ROUND_DOWN
-from typing import Union
-from enum import Enum
+from decimal import ROUND_DOWN, Decimal
+from enum import StrEnum
 
 
-class OrderSide(str, Enum):
+class OrderSide(StrEnum):
     BUY = "BUY"
     SELL = "SELL"
 
 
-class OrderType(str, Enum):
+class OrderType(StrEnum):
     MARKET = "MARKET"
     LIMIT = "LIMIT"
 
 
-class OrderStatus(str, Enum):
+class OrderStatus(StrEnum):
     PENDING = "PENDING"
     OPEN = "OPEN"
     FILLED = "FILLED"
@@ -40,7 +39,7 @@ class OrderRequest:
     side: OrderSide
     order_type: OrderType
     quantity: float
-    price: float | None = None        # Limit price (None = market)
+    price: float | None = None  # Limit price (None = market)
     client_order_id: str = ""
     stop_price: float | None = None
 
@@ -80,12 +79,12 @@ class SymbolFilters:
     min_notional: Decimal
     tick_size: Decimal
 
-    def quantize_qty(self, qty: Union[float, Decimal]) -> Decimal:
+    def quantize_qty(self, qty: float | Decimal) -> Decimal:
         """Round quantity down to step_size precision. Decimal-safe: never uses float internally."""
         d = qty if isinstance(qty, Decimal) else Decimal(str(qty))
         return d.quantize(self.step_size, rounding=ROUND_DOWN)
 
-    def quantize_price(self, price: Union[float, Decimal]) -> Decimal:
+    def quantize_price(self, price: float | Decimal) -> Decimal:
         """Round price to tick_size precision. Decimal-safe: never uses float internally."""
         d = price if isinstance(price, Decimal) else Decimal(str(price))
         return d.quantize(self.tick_size, rounding=ROUND_DOWN)
@@ -103,16 +102,13 @@ class BrokerBase(ABC):
     """Abstract broker interface."""
 
     @abstractmethod
-    async def place_order(self, request: OrderRequest) -> OrderResult:
-        ...
+    async def place_order(self, request: OrderRequest) -> OrderResult: ...
 
     @abstractmethod
-    async def cancel_order(self, symbol: str, order_id: str) -> bool:
-        ...
+    async def cancel_order(self, symbol: str, order_id: str) -> bool: ...
 
     @abstractmethod
-    async def get_order(self, symbol: str, order_id: str) -> OrderResult | None:
-        ...
+    async def get_order(self, symbol: str, order_id: str) -> OrderResult | None: ...
 
     @abstractmethod
     async def get_balances(self) -> dict[str, float]:

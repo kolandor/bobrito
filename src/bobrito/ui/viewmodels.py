@@ -10,12 +10,12 @@ from datetime import datetime
 class RiskBlockVM:
     """A single active risk protection that is currently blocking new entries."""
 
-    type: str           # "safe_mode" | "daily_loss" | "consecutive_losses" | "cooldown" | "max_trades" | "min_balance"
-    name: str           # short human-readable label
-    reason: str         # why the block is active
-    reset_tip: str      # how / when it will clear
-    severity: str       # "critical" | "warning"
-    remaining_seconds: int = 0   # cooldown only
+    type: str  # "safe_mode" | "daily_loss" | "consecutive_losses" | "cooldown" | "max_trades" | "min_balance"
+    name: str  # short human-readable label
+    reason: str  # why the block is active
+    reset_tip: str  # how / when it will clear
+    severity: str  # "critical" | "warning"
+    remaining_seconds: int = 0  # cooldown only
 
 
 @dataclass
@@ -139,9 +139,9 @@ class EventVM:
 class SignalVM:
     """One signal row — used by both the dashboard situation panel and the Signals page."""
 
-    signal_type: str          # "BUY" | "EXIT" | "HOLD"
+    signal_type: str  # "BUY" | "EXIT" | "HOLD"
     price: float
-    timestamp: str            # "HH:MM:SS" for compact display
+    timestamp: str  # "HH:MM:SS" for compact display
     explanation_friendly: str
     ema_fast: float | None = None
     ema_slow: float | None = None
@@ -153,7 +153,7 @@ class SignalVM:
     id: int = 0
     regime: str | None = None
     atr: float | None = None
-    created_at_full: str = ""   # "YYYY-MM-DD HH:MM:SS" for full-page display
+    created_at_full: str = ""  # "YYYY-MM-DD HH:MM:SS" for full-page display
 
 
 @dataclass
@@ -167,11 +167,11 @@ class SituationVM:
     ema_fast_period: int
     ema_slow_period: int
     # Chart data — Python lists; serialised to JSON inside the template
-    chart_labels: list[str]                  # e.g. ["14:35", "14:36", …]
-    chart_closes: list[float]                # 1m close prices
+    chart_labels: list[str]  # e.g. ["14:35", "14:36", …]
+    chart_closes: list[float]  # 1m close prices
     chart_ema_fast: list[float | None]
     chart_ema_slow: list[float | None]
     # Sparse marker arrays (null everywhere except the matching candle index)
-    chart_open_markers: list[float | None]         # entry price at open candle
+    chart_open_markers: list[float | None]  # entry price at open candle
     chart_close_profit_markers: list[float | None]  # exit price when PnL ≥ 0
-    chart_close_loss_markers: list[float | None]    # exit price when PnL < 0
+    chart_close_loss_markers: list[float | None]  # exit price when PnL < 0

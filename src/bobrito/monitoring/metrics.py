@@ -15,9 +15,7 @@ class MetricsCollector:
     order_rejections_total = Counter(
         "bobrito_order_rejections_total", "Total order rejections", ["reason"]
     )
-    order_latency_seconds = Histogram(
-        "bobrito_order_latency_seconds", "Order placement latency"
-    )
+    order_latency_seconds = Histogram("bobrito_order_latency_seconds", "Order placement latency")
     candle_feed_lag_seconds = Gauge(
         "bobrito_candle_feed_lag_seconds", "Seconds since last candle update"
     )

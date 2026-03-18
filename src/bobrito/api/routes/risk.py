@@ -68,7 +68,7 @@ async def reset_cooldown(bot: TradingBot = Depends(get_bot)):
     try:
         await bot.get_risk().reset_cooldown()
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {
         "message": "Post-loss cooldown and consecutive loss streak reset successfully.",
         "limits": bot.get_risk().limits_dict(),

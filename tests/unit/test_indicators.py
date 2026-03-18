@@ -76,7 +76,7 @@ class TestATR:
         highs, lows, closes = self._make_ohlc(50, spread=spread)
         result = atr(highs, lows, closes, period=14)
         valid = [v for v in result if not math.isnan(v)]
-        expected_tr = 2 * spread   # 4.0 with spread=2 and 1-unit step between closes
+        expected_tr = 2 * spread  # 4.0 with spread=2 and 1-unit step between closes
         assert abs(valid[-1] - expected_tr) < 1.0
 
     def test_nans_at_start(self):

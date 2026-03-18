@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 
@@ -33,16 +32,23 @@ def _make_mock_bot(status: str = "running"):
     }
     portfolio = MagicMock()
     portfolio.stats.return_value = {
-        "total_trades": 0, "wins": 0, "losses": 0,
-        "win_rate_pct": 0.0, "total_pnl_usdt": 0.0, "max_drawdown_pct": 0.0,
+        "total_trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate_pct": 0.0,
+        "total_pnl_usdt": 0.0,
+        "max_drawdown_pct": 0.0,
     }
     portfolio.get_open_position.return_value = None
     bot.get_portfolio.return_value = portfolio
     risk = MagicMock()
     risk.daily_pnl = 0.0
     risk.state_dict.return_value = {
-        "safe_mode": False, "daily_trades": 0, "daily_pnl": 0.0,
-        "consecutive_losses": 0, "current_day": "2026-03-15",
+        "safe_mode": False,
+        "daily_trades": 0,
+        "daily_pnl": 0.0,
+        "consecutive_losses": 0,
+        "current_day": "2026-03-15",
         "limits": {
             "max_consecutive_losses": 3,
             "max_daily_loss_pct": 3.0,
@@ -161,23 +167,17 @@ class TestLoginLogout:
         assert "/ui/dashboard" in resp.headers["location"]
 
     def test_login_correct_credentials(self):
-        resp = self.client.post(
-            "/ui/login", data={"username": "admin", "password": "testpass"}
-        )
+        resp = self.client.post("/ui/login", data={"username": "admin", "password": "testpass"})
         assert resp.status_code == 302
         assert "/ui/dashboard" in resp.headers["location"]
 
     def test_login_wrong_password(self):
-        resp = self.client.post(
-            "/ui/login", data={"username": "admin", "password": "wrong"}
-        )
+        resp = self.client.post("/ui/login", data={"username": "admin", "password": "wrong"})
         assert resp.status_code == 302
         assert "/ui/login" in resp.headers["location"]
 
     def test_login_wrong_username(self):
-        resp = self.client.post(
-            "/ui/login", data={"username": "hacker", "password": "testpass"}
-        )
+        resp = self.client.post("/ui/login", data={"username": "hacker", "password": "testpass"})
         assert resp.status_code == 302
         assert "/ui/login" in resp.headers["location"]
 

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-from decimal import Decimal
 
 from bobrito.config.settings import Settings
 from bobrito.execution.base import (
@@ -41,7 +40,7 @@ def _make_trending_candles_1m(n: int = 60, start: float = 30000.0) -> list[Candl
     price = start
     for i in range(n):
         price += 20 + (i % 5)  # rising trend
-        vol = 12.0 if i > 40 else 8.0   # volume spike near end
+        vol = 12.0 if i > 40 else 8.0  # volume spike near end
         candles.append(_make_candle(price, volume=vol, interval="1m"))
     return candles
 
@@ -49,7 +48,7 @@ def _make_trending_candles_1m(n: int = 60, start: float = 30000.0) -> list[Candl
 def _make_trending_candles_5m(n: int = 30, start: float = 30000.0) -> list[Candle]:
     candles = []
     price = start
-    for i in range(n):
+    for _i in range(n):
         price += 50
         candles.append(_make_candle(price, interval="5m"))
     return candles

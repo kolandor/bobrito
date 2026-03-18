@@ -23,7 +23,7 @@ async def get_balances(bot: TradingBot = Depends(get_bot)):
         balances = await broker.get_balances()
         return {"balances": balances}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/positions")

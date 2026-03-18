@@ -40,8 +40,10 @@ class TestCheckFeeFilter:
     async def test_disabled_always_allows(self):
         settings = make_settings(min_expected_edge_enabled=False)
         rm = RiskManager(settings, make_db_mock())
-        from bobrito.execution.base import SymbolFilters
         from decimal import Decimal
+
+        from bobrito.execution.base import SymbolFilters
+
         rm.configure_filters(
             SymbolFilters(
                 symbol="BTCUSDT",
@@ -61,8 +63,10 @@ class TestCheckFeeFilter:
         # net edge = 125 - 30 = 95 bps > 15, distance 125 > 45
         settings = make_settings()
         rm = RiskManager(settings, make_db_mock())
-        from bobrito.execution.base import SymbolFilters
         from decimal import Decimal
+
+        from bobrito.execution.base import SymbolFilters
+
         rm.configure_filters(
             SymbolFilters(
                 symbol="BTCUSDT",
@@ -79,8 +83,10 @@ class TestCheckFeeFilter:
         # entry=40000, target=40050 -> distance = 50/40000 * 10000 = 12.5 bps < 45
         settings = make_settings(min_target_distance_bps=45.0)
         rm = RiskManager(settings, make_db_mock())
-        from bobrito.execution.base import SymbolFilters
         from decimal import Decimal
+
+        from bobrito.execution.base import SymbolFilters
+
         rm.configure_filters(
             SymbolFilters(
                 symbol="BTCUSDT",
@@ -99,8 +105,10 @@ class TestCheckFeeFilter:
         # cost = 30 bps -> net = -10 bps < 15
         settings = make_settings(min_target_distance_bps=10.0, min_expected_net_edge_bps=15.0)
         rm = RiskManager(settings, make_db_mock())
-        from bobrito.execution.base import SymbolFilters
         from decimal import Decimal
+
+        from bobrito.execution.base import SymbolFilters
+
         rm.configure_filters(
             SymbolFilters(
                 symbol="BTCUSDT",

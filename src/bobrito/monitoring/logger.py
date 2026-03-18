@@ -38,7 +38,7 @@ def setup_logging(level: str = "INFO", log_file: str | None = None) -> None:
             rotation="100 MB",
             retention="30 days",
             compression="gz",
-            serialize=True,   # JSON output to file
+            serialize=True,  # JSON output to file
             enqueue=True,
         )
 

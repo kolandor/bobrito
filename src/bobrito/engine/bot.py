@@ -19,9 +19,8 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from enum import Enum
-
 from decimal import Decimal
+from enum import StrEnum
 
 from bobrito.config.settings import Settings
 from bobrito.execution.base import (
@@ -50,7 +49,7 @@ from bobrito.strategy.trend_pullback import TrendPullbackStrategy
 log = get_logger("engine.bot")
 
 
-class BotStatus(str, Enum):
+class BotStatus(StrEnum):
     IDLE = "idle"
     STARTING = "starting"
     RUNNING = "running"
@@ -365,9 +364,7 @@ class TradingBot:
 
         # ── Fee-aware filter (before risk validation) ──────────────────────
         if signal.target_price:
-            fee_decision = await self._risk.check_fee_filter(
-                signal.price, signal.target_price
-            )
+            fee_decision = await self._risk.check_fee_filter(signal.price, signal.target_price)
             if not fee_decision.allowed:
                 log.debug(f"Entry blocked by fee filter: {fee_decision.reason}")
                 async with self._db.session() as sess:
@@ -553,13 +550,11 @@ class TradingBot:
                 limit=self._s.candle_buffer_size,
             )
             log.info(
-                f"Candle buffers ready: "
-                f"1m={len(self._buf1)} bars, 5m={len(self._buf5)} bars"
+                f"Candle buffers ready: " f"1m={len(self._buf1)} bars, 5m={len(self._buf5)} bars"
             )
         except Exception as exc:
             log.warning(
-                f"Historical pre-fill failed: {exc}. "
-                "Bot will warm up from live stream instead."
+                f"Historical pre-fill failed: {exc}. " "Bot will warm up from live stream instead."
             )
 
     async def _log_system_event(self, event_type: str, description: str = "") -> None:

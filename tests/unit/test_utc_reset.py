@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from bobrito.risk.manager import get_trading_day_utc
 

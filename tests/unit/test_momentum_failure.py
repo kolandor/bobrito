@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 
 from bobrito.market_data.models import Candle, MarketSnapshot
-from bobrito.strategy.trend_pullback import TrendPullbackStrategy
 from bobrito.strategy.base import SignalType
+from bobrito.strategy.trend_pullback import TrendPullbackStrategy
 
 
 def _make_candle(close: float, interval: str = "1m") -> Candle:
@@ -92,12 +92,12 @@ def test_momentum_failure_uses_fast_ema_when_configured():
     strategy.reset_position_tracking()
     # Build candles: last close below fast EMA (e.g. 39500) but above slow EMA (e.g. 39000)
     # Fast EMA ~39600, slow EMA ~39000. Last close 39500 < 39600 -> triggers
-    fast_val, slow_val = 39600.0, 39000.0
+    _fast_val, _slow_val = 39600.0, 39000.0
     n = 60
     closes = [40000.0 - i * 20 for i in range(n)]  # declining to ~38800
     # Inject EMA-like trailing values: fast > slow, last close < fast
-    ema_fast = [float("nan")] * 8 + [39600.0] * (n - 8)
-    ema_slow = [float("nan")] * 20 + [39000.0] * (n - 20)
+    [float("nan")] * 8 + [39600.0] * (n - 8)
+    [float("nan")] * 20 + [39000.0] * (n - 20)
     # We need the strategy to compute these - so use real candle data that produces this
     candles = [_make_candle(c) for c in closes]
     flat_5m = [_make_candle(40000.0) for _ in range(30)]

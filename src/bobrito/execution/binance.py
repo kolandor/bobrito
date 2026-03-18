@@ -9,11 +9,11 @@ Safety: Live trading requires `live_trading_enabled=True` in settings.
 from __future__ import annotations
 
 import hashlib
-from decimal import Decimal
 import hmac
 import time
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from urllib.parse import urlencode
 
 import httpx
@@ -202,9 +202,7 @@ class BinanceBroker(BrokerBase):
     def _sign(self, params: dict) -> dict:
         params["timestamp"] = int(time.time() * 1000)
         query = urlencode(params)
-        sig = hmac.new(
-            self._secret.encode(), query.encode(), hashlib.sha256
-        ).hexdigest()
+        sig = hmac.new(self._secret.encode(), query.encode(), hashlib.sha256).hexdigest()
         params["signature"] = sig
         return params
 

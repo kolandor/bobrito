@@ -46,9 +46,7 @@ class TestPaperBrokerBuyOrder:
     async def test_sell_credits_usdt(self, broker: PaperBroker):
         broker.update_price(40000.0)
         # First buy
-        await broker.place_order(
-            OrderRequest("BTCUSDT", OrderSide.BUY, OrderType.MARKET, 0.001)
-        )
+        await broker.place_order(OrderRequest("BTCUSDT", OrderSide.BUY, OrderType.MARKET, 0.001))
         # Then sell
         result = await broker.place_order(
             OrderRequest("BTCUSDT", OrderSide.SELL, OrderType.MARKET, 0.001)

@@ -53,9 +53,7 @@ def atr(
     return result
 
 
-def swing_lows(
-    closes: list[float], lows: list[float], lookback: int = 5
-) -> list[float | None]:
+def swing_lows(closes: list[float], lows: list[float], lookback: int = 5) -> list[float | None]:
     """Identify swing-low pivot prices.
 
     A bar at index i is a swing low when its low is lower than the

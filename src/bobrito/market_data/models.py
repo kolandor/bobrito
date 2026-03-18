@@ -16,7 +16,7 @@ class Candle:
     low: float
     close: float
     volume: float
-    interval: str   # e.g. "1m", "5m"
+    interval: str  # e.g. "1m", "5m"
     is_closed: bool = True
     num_trades: int = 0
 

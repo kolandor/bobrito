@@ -5,14 +5,14 @@ All environment variables are documented in .env.example.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from functools import lru_cache
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class BotMode(str, Enum):
+class BotMode(StrEnum):
     PAPER = "paper"
     TESTNET = "testnet"
     LIVE = "live"
@@ -101,8 +101,8 @@ class Settings(BaseSettings):
     min_free_balance_usdt: float = Field(20.0, ge=0.0)
 
     # ── Paper trading slippage ────────────────────────────────────────────────
-    paper_slippage_bps: float = 5.0   # basis points
-    paper_fee_rate: float = 0.001     # 0.1 % taker fee
+    paper_slippage_bps: float = 5.0  # basis points
+    paper_fee_rate: float = 0.001  # 0.1 % taker fee
 
     # ── Database ─────────────────────────────────────────────────────────────
     database_url: str = "sqlite+aiosqlite:///./data/bobrito.db"

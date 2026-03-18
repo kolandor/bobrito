@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     BUY = "BUY"
     EXIT = "EXIT"
     HOLD = "HOLD"
 
 
-class MarketRegime(str, Enum):
+class MarketRegime(StrEnum):
     TRENDING = "TRENDING"
     SIDEWAYS = "SIDEWAYS"
     UNKNOWN = "UNKNOWN"

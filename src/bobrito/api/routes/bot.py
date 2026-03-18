@@ -18,7 +18,7 @@ async def start(bot: TradingBot = Depends(get_bot)):
         await bot.start()
         return {"message": "Bot started", "status": bot.status.value}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/stop")

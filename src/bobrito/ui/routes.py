@@ -380,10 +380,14 @@ def create_ui_router(settings: Settings) -> APIRouter:
         try:
             bot = get_bot()
             if bot.status.value != "running":
-                _set_flash(request, "error", f"Bot must be running to pause (current: {bot.status.value}).")
+                _set_flash(
+                    request, "error", f"Bot must be running to pause (current: {bot.status.value})."
+                )
             else:
                 bot.pause()
-                _set_flash(request, "success", "Bot paused — exits still monitored, no new entries.")
+                _set_flash(
+                    request, "success", "Bot paused — exits still monitored, no new entries."
+                )
                 log.info("UI audit: action=pause")
         except Exception as exc:
             log.exception("UI action pause failed")
@@ -402,7 +406,9 @@ def create_ui_router(settings: Settings) -> APIRouter:
         try:
             bot = get_bot()
             if bot.status.value != "paused":
-                _set_flash(request, "error", f"Bot must be paused to resume (current: {bot.status.value}).")
+                _set_flash(
+                    request, "error", f"Bot must be paused to resume (current: {bot.status.value})."
+                )
             else:
                 bot.resume()
                 _set_flash(request, "success", "Bot resumed.")
@@ -502,7 +508,9 @@ def create_ui_router(settings: Settings) -> APIRouter:
                 _set_flash(
                     request,
                     "success",
-                    "Risk limits updated: " + ", ".join(changed) + ". Revert automatically at midnight.",
+                    "Risk limits updated: "
+                    + ", ".join(changed)
+                    + ". Revert automatically at midnight.",
                 )
                 log.warning(f"UI audit: action=risk_update_limits changes={changed}")
             else:

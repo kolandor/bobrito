@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-from decimal import Decimal
 
 from bobrito.execution.base import SymbolFilters
 from bobrito.risk.manager import RiskManager, _round_step
@@ -16,7 +15,9 @@ from bobrito.strategy.base import Signal, SignalType
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def make_symbol_filters(step_size: float = 0.00001, min_qty: float = 0.00001, min_notional: float = 5.0) -> SymbolFilters:
+def make_symbol_filters(
+    step_size: float = 0.00001, min_qty: float = 0.00001, min_notional: float = 5.0
+) -> SymbolFilters:
     return SymbolFilters(
         symbol="BTCUSDT",
         step_size=Decimal(str(step_size)),
@@ -24,6 +25,7 @@ def make_symbol_filters(step_size: float = 0.00001, min_qty: float = 0.00001, mi
         min_notional=Decimal(str(min_notional)),
         tick_size=Decimal("0.01"),
     )
+
 
 def make_settings(**overrides):
     from bobrito.config.settings import Settings
@@ -67,6 +69,7 @@ def make_db_mock():
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
+
 class TestRoundStep:
     def test_basic_rounding(self):
         assert _round_step(0.123456, 0.00001) == pytest.approx(0.12345, rel=1e-5)
@@ -90,7 +93,7 @@ class TestPositionSizing:
 
         price = 40000.0
         stop = 39000.0
-        stop_dist = price - stop   # = 1000
+        stop_dist = price - stop  # = 1000
         free_usdt = 1000.0
 
         # Sizing is based on tradeable balance (free_usdt - min_free_balance)

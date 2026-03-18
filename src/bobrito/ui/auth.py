@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from bobrito.config.settings import Settings
 
 
-def check_credentials(username: str, password: str, settings: "Settings | None" = None) -> bool:
+def check_credentials(username: str, password: str, settings: Settings | None = None) -> bool:
     """Constant-time comparison to prevent timing-based attacks.
 
     Pass *settings* explicitly from the route closure so the function is

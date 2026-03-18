@@ -28,23 +28,24 @@ class Base(DeclarativeBase):
 
 # ── Enum types ──────────────────────────────────────────────────────────────
 
-class SignalType(str, enum.Enum):
+
+class SignalType(enum.StrEnum):
     BUY = "BUY"
     EXIT = "EXIT"
     HOLD = "HOLD"
 
 
-class OrderSide(str, enum.Enum):
+class OrderSide(enum.StrEnum):
     BUY = "BUY"
     SELL = "SELL"
 
 
-class OrderType(str, enum.Enum):
+class OrderType(enum.StrEnum):
     MARKET = "MARKET"
     LIMIT = "LIMIT"
 
 
-class OrderStatus(str, enum.Enum):
+class OrderStatus(enum.StrEnum):
     PENDING = "PENDING"
     OPEN = "OPEN"
     FILLED = "FILLED"
@@ -53,12 +54,12 @@ class OrderStatus(str, enum.Enum):
     PARTIALLY_FILLED = "PARTIALLY_FILLED"
 
 
-class PositionStatus(str, enum.Enum):
+class PositionStatus(enum.StrEnum):
     OPEN = "OPEN"
     CLOSED = "CLOSED"
 
 
-class ExitReason(str, enum.Enum):
+class ExitReason(enum.StrEnum):
     TAKE_PROFIT = "TAKE_PROFIT"
     STOP_LOSS = "STOP_LOSS"
     MOMENTUM_FAILURE = "MOMENTUM_FAILURE"
@@ -67,7 +68,7 @@ class ExitReason(str, enum.Enum):
     MANUAL = "MANUAL"
 
 
-class RiskEventType(str, enum.Enum):
+class RiskEventType(enum.StrEnum):
     DAILY_LOSS_LIMIT = "DAILY_LOSS_LIMIT"
     CONSECUTIVE_LOSSES = "CONSECUTIVE_LOSSES"
     COOLDOWN = "COOLDOWN"
@@ -78,13 +79,14 @@ class RiskEventType(str, enum.Enum):
     MIN_EXPECTED_EDGE = "MIN_EXPECTED_EDGE"
 
 
-class BotMode(str, enum.Enum):
+class BotMode(enum.StrEnum):
     PAPER = "paper"
     TESTNET = "testnet"
     LIVE = "live"
 
 
 # ── Signal ──────────────────────────────────────────────────────────────────
+
 
 class Signal(Base):
     __tablename__ = "signals"
@@ -109,6 +111,7 @@ class Signal(Base):
 
 
 # ── Order ───────────────────────────────────────────────────────────────────
+
 
 class Order(Base):
     __tablename__ = "orders"
@@ -149,6 +152,7 @@ class Order(Base):
 
 # ── Fill ────────────────────────────────────────────────────────────────────
 
+
 class Fill(Base):
     __tablename__ = "fills"
 
@@ -164,6 +168,7 @@ class Fill(Base):
 
 
 # ── Position ─────────────────────────────────────────────────────────────────
+
 
 class Position(Base):
     __tablename__ = "positions"
@@ -187,9 +192,7 @@ class Position(Base):
     total_fees: Mapped[float] = mapped_column(Float, default=0.0)
     net_pnl: Mapped[float | None] = mapped_column(Float, nullable=True)
     risk_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
-    signal_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("signals.id"), nullable=True
-    )
+    signal_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("signals.id"), nullable=True)
 
     orders: Mapped[list[Order]] = relationship("Order", back_populates="position")
 
@@ -197,6 +200,7 @@ class Position(Base):
 
 
 # ── Balance Snapshot ─────────────────────────────────────────────────────────
+
 
 class BalanceSnapshot(Base):
     __tablename__ = "balance_snapshots"
@@ -215,6 +219,7 @@ class BalanceSnapshot(Base):
 
 # ── Risk Event ───────────────────────────────────────────────────────────────
 
+
 class RiskEvent(Base):
     __tablename__ = "risk_events"
 
@@ -229,6 +234,7 @@ class RiskEvent(Base):
 
 # ── System Event ─────────────────────────────────────────────────────────────
 
+
 class SystemEvent(Base):
     __tablename__ = "system_events"
 
@@ -240,6 +246,7 @@ class SystemEvent(Base):
 
 
 # ── Error Log ────────────────────────────────────────────────────────────────
+
 
 class ErrorLog(Base):
     __tablename__ = "error_logs"

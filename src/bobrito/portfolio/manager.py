@@ -90,9 +90,7 @@ class PortfolioManager:
         """
         async with self._db.session() as sess:
             result = await sess.execute(
-                select(DBPosition)
-                .where(DBPosition.status == PositionStatus.OPEN)
-                .limit(1)
+                select(DBPosition).where(DBPosition.status == PositionStatus.OPEN).limit(1)
             )
             db_pos = result.scalar_one_or_none()
 
@@ -132,12 +130,12 @@ class PortfolioManager:
                 select(
                     func.count(DBPosition.id).label("total"),
                     func.coalesce(func.sum(DBPosition.net_pnl), 0.0).label("total_pnl"),
-                    func.coalesce(
-                        func.sum(case((DBPosition.net_pnl > 0, 1), else_=0)), 0
-                    ).label("wins"),
-                    func.coalesce(
-                        func.sum(case((DBPosition.net_pnl <= 0, 1), else_=0)), 0
-                    ).label("losses"),
+                    func.coalesce(func.sum(case((DBPosition.net_pnl > 0, 1), else_=0)), 0).label(
+                        "wins"
+                    ),
+                    func.coalesce(func.sum(case((DBPosition.net_pnl <= 0, 1), else_=0)), 0).label(
+                        "losses"
+                    ),
                 ).where(DBPosition.status == PositionStatus.CLOSED)
             )
             row = result.one()
