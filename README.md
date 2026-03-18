@@ -17,7 +17,7 @@
 6. [Execution Modes](#execution-modes)
 7. [API Reference](#api-reference)
 8. [Web UI](#web-ui)
-9. [Docker Deployment](#docker-deployment)
+9. [Docker Deployment](#docker-deployment) — [local](#option-a--docker-compose-local--development) · [production server](#option-b--production-server-deployment)
 10. [Running Tests](#running-tests)
 11. [Project Structure](#project-structure)
 12. [Safety Notes](#safety-notes)
@@ -309,6 +309,8 @@ Interactive docs available at `http://localhost:8080/docs`.
 
 ## Docker Deployment
 
+### Option A — docker-compose (local / development)
+
 ```bash
 # Copy and configure environment
 cp .env.example .env
@@ -331,6 +333,151 @@ Services:
 | bobrito | 9090 | Prometheus metrics |
 | prometheus | 9191 | Prometheus UI |
 | grafana | 3000 | Dashboard (admin/admin) |
+
+---
+
+### Option B — Production Server Deployment
+
+This section covers deploying the bot on a remote Linux server using the Docker Hub image published by CI.
+
+#### What gets stored where
+
+The container writes to two internal paths. Mount them to your host so data survives restarts and updates:
+
+| Inside container | Host path | Contents |
+|---|---|---|
+| `/app/data/bobrito.db` | `~/bobrito/data/` | SQLite database — all trades, signals, positions |
+| `/app/logs/bobrito.log` | `~/bobrito/logs/` | Application log file |
+
+#### Step 1 — Connect to your server
+
+```bash
+ssh user@your-server-ip
+```
+
+#### Step 2 — Create the working directory
+
+```bash
+mkdir -p ~/bobrito/data
+mkdir -p ~/bobrito/logs
+cd ~/bobrito
+```
+
+#### Step 3 — Create the `.env` file on the server
+
+```bash
+nano ~/bobrito/.env
+```
+
+Paste the contents of your local `.env` file. Before saving, generate a real `API_SECRET_KEY`:
+
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Replace the `change_me_to_a_random_secret_at_least_32_chars` placeholder with the output, then save (`Ctrl+O` → `Enter` → `Ctrl+X`).
+
+Restrict file permissions so only your user can read it:
+
+```bash
+chmod 600 ~/bobrito/.env
+```
+
+#### Step 4 — Install Docker (if not already installed)
+
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+#### Step 5 — Pull the image
+
+```bash
+docker pull kolandor/bobrito:latest
+```
+
+#### Step 6 — Run the container
+
+```bash
+docker run -d \
+  --name bobrito \
+  --env-file ~/bobrito/.env \
+  -p 8080:8080 \
+  -v ~/bobrito/data:/app/data \
+  -v ~/bobrito/logs:/app/logs \
+  --restart unless-stopped \
+  kolandor/bobrito:latest
+```
+
+| Flag | Purpose |
+|---|---|
+| `-d` | Run in background (detached) |
+| `--name bobrito` | Name the container for easy management |
+| `--env-file ~/bobrito/.env` | Load all config from your file |
+| `-p 8080:8080` | Expose the API and Web UI on port 8080 |
+| `-v ~/bobrito/data:/app/data` | Persist the database on the host |
+| `-v ~/bobrito/logs:/app/logs` | Persist logs on the host |
+| `--restart unless-stopped` | Auto-restart after server reboot or crash |
+
+#### Step 7 — Verify it's running
+
+```bash
+# Check the container is up
+docker ps
+
+# View live logs
+docker logs -f bobrito
+
+# Health check
+curl http://localhost:8080/health
+```
+
+If `WEB_UI_ENABLED=true`, the dashboard is available at:
+```
+http://your-server-ip:8080/ui
+```
+
+#### Day-to-day management
+
+```bash
+# Stop the bot
+docker stop bobrito
+
+# Start it again
+docker start bobrito
+
+# Restart (e.g. after editing .env)
+docker restart bobrito
+```
+
+#### Updating to a new version
+
+When a new image is pushed to Docker Hub after a commit to `main`:
+
+```bash
+docker stop bobrito
+docker rm bobrito
+docker pull kolandor/bobrito:latest
+docker run -d \
+  --name bobrito \
+  --env-file ~/bobrito/.env \
+  -p 8080:8080 \
+  -v ~/bobrito/data:/app/data \
+  -v ~/bobrito/logs:/app/logs \
+  --restart unless-stopped \
+  kolandor/bobrito:latest
+```
+
+Your database (`~/bobrito/data/`) and logs (`~/bobrito/logs/`) are unaffected by updates — they live on the host, not inside the container.
+
+#### Changing a config value
+
+```bash
+nano ~/bobrito/.env
+# Make your change, save, then restart:
+docker restart bobrito
+```
 
 ---
 
