@@ -14,6 +14,7 @@ src/bobrito/api/deps.py
 src/bobrito/api/routes/__init__.py
 src/bobrito/api/routes/bot.py
 src/bobrito/api/routes/health.py
+src/bobrito/api/routes/risk.py
 src/bobrito/api/routes/trading.py
 src/bobrito/config/__init__.py
 src/bobrito/config/settings.py
@@ -26,6 +27,7 @@ src/bobrito/execution/paper.py
 src/bobrito/market_data/__init__.py
 src/bobrito/market_data/buffer.py
 src/bobrito/market_data/feed.py
+src/bobrito/market_data/history.py
 src/bobrito/market_data/models.py
 src/bobrito/monitoring/__init__.py
 src/bobrito/monitoring/logger.py

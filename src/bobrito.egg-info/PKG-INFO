@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: bobrito
-Version: 1.1.0
+Version: 1.3
 Summary: Automated Trading Bot for Binance Spot BTC/USDT
 Requires-Python: >=3.11
 Requires-Dist: fastapi>=0.111.0
