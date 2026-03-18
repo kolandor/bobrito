@@ -8,9 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
+# Stub src layout so pip can resolve metadata without the real source.
+# Only runtime deps are installed here; dev deps are not needed in the image.
+RUN mkdir -p src/bobrito && touch src/bobrito/__init__.py
 RUN pip install --upgrade pip \
-    && pip install --prefix=/install . \
-    && pip install --prefix=/install ".[dev]"
+    && pip install --prefix=/install .
 
 
 # ── Stage 2: runtime image ────────────────────────────────────────────────────
