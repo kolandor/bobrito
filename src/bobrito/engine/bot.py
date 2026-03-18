@@ -337,6 +337,7 @@ class TradingBot:
         # ── Check stop/target when position is open ────────────────────────
         if has_position:
             pos = self._portfolio.get_open_position()
+            assert pos is not None
             price = snapshot.last_price
             if pos.is_stop_hit(price):
                 log.info(f"Stop hit @ {price:.2f} (stop={pos.stop_price:.2f})")
@@ -375,6 +376,7 @@ class TradingBot:
                 return
 
         # ── Risk validation ───────────────────────────────────────────────
+        assert self._broker is not None
         balances = await self._broker.get_balances()
         free_usdt = balances.get("USDT", 0.0)
 
@@ -398,6 +400,7 @@ class TradingBot:
     async def _execute_entry(
         self, snapshot: MarketSnapshot, signal, quantity: float, risk_amount: float, signal_id: int
     ) -> None:
+        assert self._broker is not None
         request = OrderRequest(
             symbol=self._s.symbol,
             side=OrderSide.BUY,
@@ -429,6 +432,7 @@ class TradingBot:
                 await sess.commit()
 
     async def _execute_exit(self, snapshot: MarketSnapshot, reason: ExitReason) -> None:
+        assert self._broker is not None
         pos = self._portfolio.get_open_position()
         if pos is None:
             return

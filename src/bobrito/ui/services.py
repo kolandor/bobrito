@@ -7,6 +7,7 @@ duplicated here; this module only formats and aggregates for display.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import cast
 
 from sqlalchemy import and_, desc, or_, select
 
@@ -432,9 +433,7 @@ class UIService:
                 trades = []
                 for r in rows:
                     pnl = r.net_pnl
-                    reason = (
-                        r.exit_reason.value if hasattr(r.exit_reason, "value") else r.exit_reason
-                    )
+                    reason = getattr(r.exit_reason, "value", r.exit_reason)
                     trades.append(
                         TradeVM(
                             id=r.id,
@@ -581,7 +580,7 @@ class UIService:
                             )
                         )
                     )
-                    for pos in result.scalars().all():
+                    for pos in cast(list[Position], result.scalars().all()):
                         # ── Entry marker ──────────────────────────────────
                         if pos.opened_at:
                             lbl = pos.opened_at.strftime("%H:%M")
@@ -660,7 +659,7 @@ class UIService:
                             target_price=r.target_price,
                             acted_on=bool(r.acted_on),
                             rejected_reason=getattr(r, "rejected_reason", None),
-                            regime=r.regime.value if hasattr(r.regime, "value") else r.regime,
+                            regime=getattr(r.regime, "value", r.regime),
                         )
                     )
                 return signals, has_more

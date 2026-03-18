@@ -90,7 +90,7 @@ class HistoricalLoader:
         Requests limit+1 bars and discards the last one, which is the
         currently open (incomplete) candle on Binance.
         """
-        params = {
+        params: dict[str, str | int] = {
             "symbol": self._symbol,
             "interval": interval,
             "limit": limit + 1,  # +1 so we can drop the open bar

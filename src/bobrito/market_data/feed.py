@@ -109,7 +109,9 @@ class MarketDataFeed:
                     break
                 await self._dispatch(raw)
 
-    async def _dispatch(self, raw: str) -> None:
+    async def _dispatch(self, raw: str | bytes) -> None:
+        if isinstance(raw, bytes):
+            raw = raw.decode()
         try:
             msg = json.loads(raw)
         except json.JSONDecodeError:
