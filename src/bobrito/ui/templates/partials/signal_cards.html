@@ -77,12 +77,18 @@
       {% endif %}
     </div>
 
-    <!-- Acted On -->
+    <!-- Acted On / Blocked -->
     <div class="col-span-1 text-center">
       {% if s.acted_on %}
       <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-900/60">
         <svg class="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+        </svg>
+      </span>
+      {% elif s.rejected_reason and s.signal_type == 'BUY' %}
+      <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-900/60" title="{{ s.rejected_reason }}">
+        <svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
         </svg>
       </span>
       {% else %}
@@ -113,6 +119,9 @@
       {% elif s.signal_type == 'EXIT' %}border-orange-800/40
       {% else %}border-slate-700/40{% endif %}">
       <p class="text-slate-400 text-sm leading-relaxed">{{ s.explanation_friendly }}</p>
+      {% if s.rejected_reason and s.signal_type == 'BUY' and not s.acted_on %}
+      <p class="text-amber-400 text-sm mt-2 font-medium">Not executed: {{ s.rejected_reason }}</p>
+      {% endif %}
       {% if s.signal_type == 'BUY' and s.stop_price and s.target_price %}
       <div class="flex flex-wrap gap-4 mt-3 text-xs font-mono">
         <span class="text-slate-500">Entry: <span class="text-slate-300">${{ "{:,.2f}".format(s.price) }}</span></span>

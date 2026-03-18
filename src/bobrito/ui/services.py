@@ -510,6 +510,7 @@ class UIService:
                             stop_price=row.stop_price,
                             target_price=row.target_price,
                             acted_on=bool(row.acted_on),
+                            rejected_reason=getattr(row, "rejected_reason", None),
                         )
                     )
         except Exception as exc:
@@ -642,15 +643,14 @@ class UIService:
                             price=r.price,
                             timestamp=r.created_at.strftime("%H:%M:%S"),
                             created_at_full=r.created_at.strftime("%Y-%m-%d %H:%M"),
-                            explanation_friendly=_signal_friendly(
-                                st, r.explanation, r.stop_price, r.target_price
-                            ),
+                            explanation_friendly=_signal_friendly(st, r.explanation, r.stop_price, r.target_price),
                             ema_fast=r.ema_fast,
                             ema_slow=r.ema_slow,
                             atr=r.atr,
                             stop_price=r.stop_price,
                             target_price=r.target_price,
                             acted_on=bool(r.acted_on),
+                            rejected_reason=getattr(r, "rejected_reason", None),
                             regime=r.regime.value if hasattr(r.regime, "value") else r.regime,
                         )
                     )

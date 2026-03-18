@@ -148,6 +148,7 @@ class SignalVM:
     stop_price: float | None = None
     target_price: float | None = None
     acted_on: bool = False
+    rejected_reason: str | None = None  # Why a BUY was not executed (fee filter, risk, etc.)
     # Extended fields — used on the full Signals page
     id: int = 0
     regime: str | None = None

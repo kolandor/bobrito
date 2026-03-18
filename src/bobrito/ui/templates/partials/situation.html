@@ -53,6 +53,9 @@
           </div>
 
           <p class="text-slate-400 text-xs leading-relaxed">{{ s.explanation_friendly }}</p>
+          {% if s.rejected_reason and s.signal_type == 'BUY' and not s.acted_on %}
+          <p class="text-amber-400 text-xs mt-1.5 font-medium">Not executed: {{ s.rejected_reason }}</p>
+          {% endif %}
 
           {% if s.signal_type == 'BUY' and s.ema_fast %}
           <div class="flex gap-3 mt-2 pt-2 border-t border-slate-700/40">
